@@ -1,0 +1,49 @@
+# ============================================================
+# Hausverwaltung Portal – docker-compose für Self-Hosting
+# Getestet für: Amlogic S912 TV-Box, Armbian Linux 6.1.149-ophub,
+#               Debian bookworm, ARM64 (arm64/aarch64)
+#
+# Start:   docker compose up -d --build
+# Logs:    docker compose logs -f
+# Stop:    docker compose down
+# Update:  siehe scripts/update.sh
+# ============================================================
+services:
+  hausverwaltung:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hausverwaltung-portal:latest
+    container_name: hausverwaltung
+    restart: unless-stopped
+    ports:
+      # Host-Port links, Container-Port rechts.
+      # 3000 frei wählbar anpassen, falls auf der TV-Box schon belegt
+      # (homeassistant/portainer laufen üblicherweise auf anderen Ports).
+      - "3000:3000"
+    volumes:
+      # Persistiert die komplette Datenbank (D1-SQLite: Objekte, Wohnungen,
+      # Mieter, Zählerstände, Kosten, Dokumente, Logo/Branding, Logins).
+      # OHNE dieses Volume gehen bei jedem Container-Neustart alle Daten verloren!
+      - hausverwaltung_data:/app/.wrangler/state
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    # Mit Portainer/Homeassistant kompatibles, eigenständiges Netzwerk;
+    # bei Bedarf hier ein externes Netzwerk (z.B. "proxy") einbinden.
+    networks:
+      - hausverwaltung_net
+
+networks:
+  hausverwaltung_net:
+    driver: bridge
+
+volumes:
+  hausverwaltung_data:
+    driver: local

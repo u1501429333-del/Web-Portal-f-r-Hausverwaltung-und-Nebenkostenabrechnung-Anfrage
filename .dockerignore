@@ -1,0 +1,10 @@
+node_modules
+.git
+.wrangler
+dist
+*.log
+.env
+.env.production
+.dev.vars
+.DS_Store
+*.tar.gz
