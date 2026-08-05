@@ -1,11 +1,80 @@
 import { Hono } from 'hono'
 import type { AppContext } from '../lib/types'
 import { requireAdmin } from './auth'
-import { generateMietvertrag, generateHausordnung, generateReinigungsplan } from '../lib/dokumente'
+import { generateMietvertrag, generateHausordnung, generateReinigungsplan, generateWohnungsuebergabe } from '../lib/dokumente'
 import { generateAbrechnungHtml } from '../lib/abrechnungPdf'
 import { berechneMieterabrechnung } from '../lib/calc'
+import { getBranding } from '../lib/settings'
 
 export const dokumenteRoutes = new Hono<AppContext>()
+
+// ============================================================
+// Wiederverwendbare Generier-/Speicher-Helfer (auch für Auto-Generierung
+// beim Anlegen neuer Wohnungen/Mieter genutzt, siehe routes/wohnungen.ts + objekte.ts)
+// ============================================================
+
+export async function generateAndSaveMietvertrag(db: D1Database, mieterId: number) {
+  const mieter = await db.prepare('SELECT * FROM mieter WHERE id = ?').bind(mieterId).first<any>()
+  if (!mieter) throw new Error('Mieter nicht gefunden')
+  const wohnung = await db.prepare('SELECT * FROM wohnungen WHERE id = ?').bind(mieter.wohnung_id).first<any>()
+  const objekt = await db.prepare('SELECT * FROM objekte WHERE id = ?').bind(wohnung.objekt_id).first<any>()
+  const branding = await getBranding(db)
+  const html = generateMietvertrag(objekt, wohnung, mieter, branding)
+  const res = await db
+    .prepare('INSERT INTO dokumente (objekt_id, wohnung_id, mieter_id, typ, titel, inhalt_html) VALUES (?,?,?,?,?,?)')
+    .bind(objekt.id, wohnung.id, mieter.id, 'mietvertrag', `Mietvertrag ${wohnung.bezeichnung} - ${mieter.nachname}`, html)
+    .run()
+  return { id: res.meta.last_row_id, html }
+}
+
+export async function generateAndSaveWohnungsuebergabe(db: D1Database, mieterId: number) {
+  const mieter = await db.prepare('SELECT * FROM mieter WHERE id = ?').bind(mieterId).first<any>()
+  if (!mieter) throw new Error('Mieter nicht gefunden')
+  const wohnung = await db.prepare('SELECT * FROM wohnungen WHERE id = ?').bind(mieter.wohnung_id).first<any>()
+  const objekt = await db.prepare('SELECT * FROM objekte WHERE id = ?').bind(wohnung.objekt_id).first<any>()
+  const branding = await getBranding(db)
+  const html = generateWohnungsuebergabe(objekt, wohnung, mieter, branding, 'einzug')
+  const res = await db
+    .prepare('INSERT INTO dokumente (objekt_id, wohnung_id, mieter_id, typ, titel, inhalt_html) VALUES (?,?,?,?,?,?)')
+    .bind(objekt.id, wohnung.id, mieter.id, 'wohnungsuebergabe', `Wohnungsübergabe ${wohnung.bezeichnung} - ${mieter.nachname}`, html)
+    .run()
+  return { id: res.meta.last_row_id, html }
+}
+
+export async function generateAndSaveHausordnung(db: D1Database, objektId: number) {
+  const objekt = await db.prepare('SELECT * FROM objekte WHERE id = ?').bind(objektId).first<any>()
+  if (!objekt) throw new Error('Objekt nicht gefunden')
+  const branding = await getBranding(db)
+  const html = generateHausordnung(objekt, branding)
+  const res = await db
+    .prepare('INSERT INTO dokumente (objekt_id, typ, titel, inhalt_html) VALUES (?,?,?,?)')
+    .bind(objekt.id, 'hausordnung', `Hausordnung ${objekt.name}`, html)
+    .run()
+  return { id: res.meta.last_row_id, html }
+}
+
+/** Regeneriert (löscht + erstellt neu) den Treppenreinigungsplan eines Objekts für ein Jahr.
+ *  Wird automatisch aufgerufen, sobald eine neue Wohnung angelegt wird, damit die
+ *  wöchentliche Rotation immer alle aktuellen Wohnungen berücksichtigt. */
+export async function generateAndSaveReinigungsplan(db: D1Database, objektId: number, jahr?: number) {
+  const objekt = await db.prepare('SELECT * FROM objekte WHERE id = ?').bind(objektId).first<any>()
+  if (!objekt) throw new Error('Objekt nicht gefunden')
+  const year = jahr || new Date().getFullYear()
+  const wohnungenRows = await db.prepare('SELECT * FROM wohnungen WHERE objekt_id = ? ORDER BY sort_order, id').bind(objektId).all<any>()
+  const branding = await getBranding(db)
+  const html = generateReinigungsplan(objekt, wohnungenRows.results as any[], branding, year)
+  // Alten Plan für dieses Objekt + Jahr entfernen, damit stets nur ein aktueller Plan existiert
+  await db.prepare(`DELETE FROM dokumente WHERE objekt_id = ? AND typ = 'reinigungsplan' AND titel LIKE ?`).bind(objektId, `%${year}%`).run()
+  const res = await db
+    .prepare('INSERT INTO dokumente (objekt_id, typ, titel, inhalt_html) VALUES (?,?,?,?)')
+    .bind(objekt.id, 'reinigungsplan', `Treppenreinigungsplan ${year} - ${objekt.name}`, html)
+    .run()
+  return { id: res.meta.last_row_id, html }
+}
+
+// ============================================================
+// Routen
+// ============================================================
 
 // Liste gespeicherter Dokumente eines Objekts
 dokumenteRoutes.get('/objekt/:objektId', requireAdmin, async (c) => {
@@ -28,51 +97,43 @@ dokumenteRoutes.delete('/:id', requireAdmin, async (c) => {
   return c.json({ ok: true })
 })
 
-// -------- Generatoren --------
+// -------- Generatoren (manuell durch Admin auslösbar) --------
 
 dokumenteRoutes.post('/generate/mietvertrag/:mieterId', requireAdmin, async (c) => {
-  const mieterId = c.req.param('mieterId')
-  const mieter = await c.env.DB.prepare('SELECT * FROM mieter WHERE id = ?').bind(mieterId).first<any>()
-  if (!mieter) return c.json({ error: 'Mieter nicht gefunden' }, 404)
-  const wohnung = await c.env.DB.prepare('SELECT * FROM wohnungen WHERE id = ?').bind(mieter.wohnung_id).first<any>()
-  const objekt = await c.env.DB.prepare('SELECT * FROM objekte WHERE id = ?').bind(wohnung.objekt_id).first<any>()
+  try {
+    const result = await generateAndSaveMietvertrag(c.env.DB, Number(c.req.param('mieterId')))
+    return c.json(result)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 404)
+  }
+})
 
-  const html = generateMietvertrag(objekt, wohnung, mieter)
-  const res = await c.env.DB.prepare(
-    'INSERT INTO dokumente (objekt_id, wohnung_id, mieter_id, typ, titel, inhalt_html) VALUES (?,?,?,?,?,?)'
-  )
-    .bind(objekt.id, wohnung.id, mieter.id, 'mietvertrag', `Mietvertrag ${wohnung.bezeichnung} - ${mieter.nachname}`, html)
-    .run()
-  return c.json({ id: res.meta.last_row_id, html })
+dokumenteRoutes.post('/generate/wohnungsuebergabe/:mieterId', requireAdmin, async (c) => {
+  try {
+    const result = await generateAndSaveWohnungsuebergabe(c.env.DB, Number(c.req.param('mieterId')))
+    return c.json(result)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 404)
+  }
 })
 
 dokumenteRoutes.post('/generate/hausordnung/:objektId', requireAdmin, async (c) => {
-  const objektId = c.req.param('objektId')
-  const objekt = await c.env.DB.prepare('SELECT * FROM objekte WHERE id = ?').bind(objektId).first<any>()
-  if (!objekt) return c.json({ error: 'Objekt nicht gefunden' }, 404)
-
-  const html = generateHausordnung(objekt)
-  const res = await c.env.DB.prepare(
-    'INSERT INTO dokumente (objekt_id, typ, titel, inhalt_html) VALUES (?,?,?,?)'
-  )
-    .bind(objekt.id, 'hausordnung', `Hausordnung ${objekt.name}`, html)
-    .run()
-  return c.json({ id: res.meta.last_row_id, html })
+  try {
+    const result = await generateAndSaveHausordnung(c.env.DB, Number(c.req.param('objektId')))
+    return c.json(result)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 404)
+  }
 })
 
 dokumenteRoutes.post('/generate/reinigungsplan/:objektId', requireAdmin, async (c) => {
-  const objektId = c.req.param('objektId')
-  const objekt = await c.env.DB.prepare('SELECT * FROM objekte WHERE id = ?').bind(objektId).first<any>()
-  if (!objekt) return c.json({ error: 'Objekt nicht gefunden' }, 404)
-  const wohnungenRows = await c.env.DB.prepare('SELECT * FROM wohnungen WHERE objekt_id = ? ORDER BY sort_order, id').bind(objektId).all<any>()
-
-  const html = generateReinigungsplan(objekt, wohnungenRows.results as any[])
-  const res = await c.env.DB.prepare(
-    'INSERT INTO dokumente (objekt_id, typ, titel, inhalt_html) VALUES (?,?,?,?)'
-  )
-    .bind(objekt.id, 'reinigungsplan', `Treppenreinigungsplan ${objekt.name}`, html)
-    .run()
-  return c.json({ id: res.meta.last_row_id, html })
+  const jahr = Number(c.req.query('jahr')) || new Date().getFullYear()
+  try {
+    const result = await generateAndSaveReinigungsplan(c.env.DB, Number(c.req.param('objektId')), jahr)
+    return c.json(result)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 404)
+  }
 })
 
 // Nebenkostenabrechnung als druckfertiges HTML (live, ohne Speicherung) - für Admin und Mieter (eigene Wohnung)
@@ -104,6 +165,7 @@ dokumenteRoutes.get('/abrechnung-html/:wohnungId/:jahr', async (c) => {
     vorjahr = null
   }
 
-  const html = generateAbrechnungHtml(objekt, eigene, jahr, vorjahr)
+  const branding = await getBranding(c.env.DB)
+  const html = generateAbrechnungHtml(objekt, eigene, jahr, vorjahr, branding)
   return c.html(html)
 })

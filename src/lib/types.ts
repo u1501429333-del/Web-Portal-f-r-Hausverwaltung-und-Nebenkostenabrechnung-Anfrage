@@ -59,6 +59,24 @@ export interface Mieter {
   iban: string
   kontoinhaber: string
   aktiv: number
+  stellplatz_vorhanden?: number
+  stellplatz_nr?: string
+  stellplatz_miete?: number
+  garage_vorhanden?: number
+  garage_nr?: string
+  garage_miete?: number
+  keller_vorhanden?: number
+  keller_nr?: string
+  garten_vorhanden?: number
+  garten_beschreibung?: string
+  anzahl_hausschluessel?: number
+  anzahl_briefkastenschluessel?: number
+  sonstige_schluessel?: string
+}
+
+export interface Branding {
+  app_name: string
+  logo_data_url: string
 }
 
 export type ZaehlerTyp = 'wmz_heizung' | 'wmz_boiler' | 'warmwasser' | 'kaltwasser' | 'sonstige'

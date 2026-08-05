@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppContext } from '../lib/types'
 import { requireAdmin } from './auth'
+import { generateAndSaveReinigungsplan } from './dokumente'
 
 export const objekteRoutes = new Hono<AppContext>()
 
@@ -67,5 +68,14 @@ objekteRoutes.post('/:id/wohnungen', requireAdmin, async (c) => {
   )
     .bind(objektId, b.bezeichnung || '', b.lage || '', b.flaeche_m2 || 0, b.sort_order || 0)
     .run()
+
+  // Treppenreinigungsplan automatisch neu erzeugen, da sich die Anzahl der
+  // Wohnungen (und damit die wöchentliche Rotation) geändert hat.
+  try {
+    await generateAndSaveReinigungsplan(c.env.DB, Number(objektId), new Date().getFullYear())
+  } catch (e) {
+    // ignorieren - Plan kann später manuell erzeugt werden
+  }
+
   return c.json({ id: res.meta.last_row_id })
 })

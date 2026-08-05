@@ -10,6 +10,7 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
     { key: 'kosten', href: '#/admin/kosten', icon: 'fa-file-invoice-dollar', label: 'Kosten erfassen' },
     { key: 'abrechnung', href: '#/admin/abrechnung', icon: 'fa-calculator', label: 'Abrechnung' },
     { key: 'dokumente', href: '#/admin/dokumente', icon: 'fa-file-contract', label: 'Dokumente' },
+    { key: 'einstellungen', href: '#/admin/einstellungen', icon: 'fa-gear', label: 'Stammdaten / Branding' },
   ];
   const navItemsMieter = [
     { key: 'dashboard', href: '#/mieter', icon: 'fa-gauge-high', label: 'Übersicht' },
@@ -30,8 +31,10 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
       <aside class="w-64 bg-slate-900 text-slate-200 flex flex-col no-print">
         <div class="p-5 border-b border-slate-700">
           <div class="flex items-center gap-2">
-            <i class="fas fa-building-shield text-blue-400 text-xl"></i>
-            <span class="font-bold text-white text-lg">Hausverwaltung</span>
+            ${AppState.branding?.logo_data_url
+              ? `<img src="${AppState.branding.logo_data_url}" alt="Logo" class="h-8 max-w-[40px] object-contain rounded bg-white p-0.5" />`
+              : '<i class="fas fa-building-shield text-blue-400 text-xl"></i>'}
+            <span class="font-bold text-white text-lg truncate">${escapeHtml(AppState.branding?.app_name || 'Hausverwaltung')}</span>
           </div>
           <p class="text-xs text-slate-400 mt-1">${isAdmin ? 'Admin-Bereich' : 'Mieter-Portal'}</p>
         </div>

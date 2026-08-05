@@ -38,6 +38,45 @@ kostenRoutes.delete('/kostenarten/:id', requireAdmin, async (c) => {
   return c.json({ ok: true })
 })
 
+// -------- Individuelle Verteilerschlüssel-Anteile (frei definierbar je Wohnung) --------
+// Wird genutzt, wenn eine Kostenart den Verteilerschlüssel "individuell" verwendet:
+// Der Admin kann hier für jede Wohnung einen eigenen Prozentsatz festlegen (statt Gleichverteilung).
+kostenRoutes.get('/kostenarten/:id/anteile', requireAdmin, async (c) => {
+  const kostenartId = c.req.param('id')
+  const ka = await c.env.DB.prepare('SELECT * FROM kostenarten WHERE id = ?').bind(kostenartId).first<any>()
+  if (!ka) return c.json({ error: 'Kostenart nicht gefunden' }, 404)
+  const wohnungen = await c.env.DB.prepare('SELECT id, bezeichnung, lage FROM wohnungen WHERE objekt_id = ? ORDER BY sort_order, id')
+    .bind(ka.objekt_id)
+    .all<any>()
+  const anteileRows = await c.env.DB.prepare('SELECT wohnung_id, anteil_pct FROM individuelle_anteile WHERE kostenart_id = ?')
+    .bind(kostenartId)
+    .all<any>()
+  const map = new Map<number, number>()
+  for (const r of anteileRows.results as any[]) map.set(r.wohnung_id, r.anteil_pct)
+  const result = (wohnungen.results as any[]).map((w) => ({
+    wohnung_id: w.id,
+    bezeichnung: w.bezeichnung,
+    lage: w.lage,
+    anteil_pct: map.get(w.id) ?? 0,
+  }))
+  return c.json(result)
+})
+
+kostenRoutes.post('/kostenarten/:id/anteile', requireAdmin, async (c) => {
+  const kostenartId = c.req.param('id')
+  const b = await c.req.json<any>() // { anteile: [{ wohnung_id, anteil_pct }] } -- anteil_pct als Bruch 0..1
+  const anteile = Array.isArray(b.anteile) ? b.anteile : []
+  for (const a of anteile) {
+    await c.env.DB.prepare(
+      `INSERT INTO individuelle_anteile (kostenart_id, wohnung_id, anteil_pct) VALUES (?,?,?)
+       ON CONFLICT(kostenart_id, wohnung_id) DO UPDATE SET anteil_pct=excluded.anteil_pct`
+    )
+      .bind(kostenartId, a.wohnung_id, a.anteil_pct || 0)
+      .run()
+  }
+  return c.json({ ok: true })
+})
+
 // -------- Kosten (Jahresbeträge) --------
 kostenRoutes.get('/objekt/:objektId/jahr/:jahr', async (c) => {
   const objektId = c.req.param('objektId')

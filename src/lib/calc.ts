@@ -245,10 +245,29 @@ export async function berechneVerteilung(
       if (ka.verteilerschluessel === 'warmwasser_30_70') gesamtbetrag = gasInfo.kostenWarmwasser
     }
 
+    // Bei "individuell" kann der Admin für diese Kostenart pro Wohnung einen frei definierten
+    // Prozentanteil hinterlegt haben (Tabelle individuelle_anteile). Ist nichts hinterlegt,
+    // fällt anteilFuerSchluessel() automatisch auf eine Gleichverteilung zurück.
+    let customMap: Record<number, number> | null = null
+    if (ka.verteilerschluessel === 'individuell') {
+      const rows = await db
+        .prepare('SELECT wohnung_id, anteil_pct FROM individuelle_anteile WHERE kostenart_id = ?')
+        .bind(ka.id)
+        .all<{ wohnung_id: number; anteil_pct: number }>()
+      const raw = rows.results as any[]
+      if (raw.length > 0) {
+        const sum = raw.reduce((s, r) => s + (r.anteil_pct || 0), 0)
+        if (sum > 0) {
+          customMap = {}
+          for (const r of raw) customMap[r.wohnung_id] = (r.anteil_pct || 0) / sum
+        }
+      }
+    }
+
     const anteile: Record<number, { anteil_pct: number; betrag: number }> = {}
     let summeVerteilt = 0
     for (const w of wohnungen) {
-      const pct = anteilFuerSchluessel(ka.verteilerschluessel, w, summen)
+      const pct = customMap ? customMap[w.wohnung_id] ?? 0 : anteilFuerSchluessel(ka.verteilerschluessel, w, summen)
       const betrag = gesamtbetrag * pct
       anteile[w.wohnung_id] = { anteil_pct: pct, betrag }
       summeVerteilt += betrag

@@ -58,6 +58,12 @@ async function router() {
   }
 
   try {
+    await ensureBrandingLoaded();
+  } catch {
+    // Branding ist rein kosmetisch – Fehler hier dürfen die App nicht blockieren
+  }
+
+  try {
     await matched.handler(app, matched.params, matched.query);
   } catch (err) {
     console.error(err);
@@ -75,14 +81,18 @@ window.addEventListener('DOMContentLoaded', () => {
 // Login-Seite
 // ============================================================
 registerRoute('/login', async (app) => {
+  try { await ensureBrandingLoaded(); } catch {}
+  const branding = AppState.branding || { app_name: 'Hausverwaltung Portal', logo_data_url: '' };
   app.innerHTML = `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 via-blue-800 to-slate-900 px-4">
       <div class="w-full max-w-md">
         <div class="text-center mb-6">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mb-3">
-            <i class="fas fa-building-shield text-3xl text-white"></i>
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mb-3 overflow-hidden">
+            ${branding.logo_data_url
+              ? `<img src="${branding.logo_data_url}" alt="Logo" class="w-full h-full object-contain p-1" />`
+              : '<i class="fas fa-building-shield text-3xl text-white"></i>'}
           </div>
-          <h1 class="text-2xl font-bold text-white">Hausverwaltung Portal</h1>
+          <h1 class="text-2xl font-bold text-white">${escapeHtml(branding.app_name || 'Hausverwaltung Portal')}</h1>
           <p class="text-blue-200 text-sm mt-1">Nebenkostenabrechnung &amp; Mieterverwaltung</p>
         </div>
         <div class="card p-8">

@@ -41,6 +41,11 @@ const API = {
   updateMieter: (id, data) => api.put(`/mieter/${id}`, data).then((r) => r.data),
   deleteMieter: (id) => api.delete(`/mieter/${id}`).then((r) => r.data),
 
+  // Mieter-Login-Zugang (Einladen/Zugang erstellen)
+  getMieterLoginStatus: (id) => api.get(`/mieter/${id}/login-status`).then((r) => r.data),
+  createMieterLogin: (id, data) => api.post(`/mieter/${id}/create-login`, data).then((r) => r.data),
+  resetMieterPassword: (id, data) => api.post(`/mieter/${id}/reset-password`, data || {}).then((r) => r.data),
+
   // Zähler
   listZaehlerByObjekt: (objektId) => api.get(`/zaehler/objekt/${objektId}`).then((r) => r.data),
   listZaehlerMitStand: (objektId, jahr) => api.get(`/zaehler/objekt/${objektId}/jahr/${jahr}`).then((r) => r.data),
@@ -59,6 +64,8 @@ const API = {
   setKosten: (objektId, jahr, data) => api.post(`/kosten/objekt/${objektId}/jahr/${jahr}`, data).then((r) => r.data),
   getGas: (objektId, jahr) => api.get(`/kosten/gas/${objektId}/${jahr}`).then((r) => r.data),
   setGas: (objektId, jahr, data) => api.post(`/kosten/gas/${objektId}/${jahr}`, data).then((r) => r.data),
+  getIndividuelleAnteile: (kostenartId) => api.get(`/kosten/kostenarten/${kostenartId}/anteile`).then((r) => r.data),
+  setIndividuelleAnteile: (kostenartId, data) => api.post(`/kosten/kostenarten/${kostenartId}/anteile`, data).then((r) => r.data),
 
   // Abrechnung
   getVerteilung: (objektId, jahr) => api.get(`/abrechnung/objekt/${objektId}/jahr/${jahr}`).then((r) => r.data),
@@ -70,10 +77,18 @@ const API = {
   listDokumente: (objektId) => api.get(`/dokumente/objekt/${objektId}`).then((r) => r.data),
   deleteDokument: (id) => api.delete(`/dokumente/${id}`).then((r) => r.data),
   generateMietvertrag: (mieterId) => api.post(`/dokumente/generate/mietvertrag/${mieterId}`).then((r) => r.data),
+  generateWohnungsuebergabe: (mieterId) => api.post(`/dokumente/generate/wohnungsuebergabe/${mieterId}`).then((r) => r.data),
   generateHausordnung: (objektId) => api.post(`/dokumente/generate/hausordnung/${objektId}`).then((r) => r.data),
-  generateReinigungsplan: (objektId) => api.post(`/dokumente/generate/reinigungsplan/${objektId}`).then((r) => r.data),
+  generateReinigungsplan: (objektId, jahr) => api.post(`/dokumente/generate/reinigungsplan/${objektId}${jahr ? '?jahr=' + jahr : ''}`).then((r) => r.data),
   abrechnungHtmlUrl: (wohnungId, jahr) => `/api/dokumente/abrechnung-html/${wohnungId}/${jahr}`,
   dokumentHtmlUrl: (id) => `/api/dokumente/${id}/html`,
+
+  // Einstellungen (Branding: App-Name & Logo)
+  getEinstellungen: () => api.get('/einstellungen').then((r) => r.data),
+  updateEinstellungen: (data) => api.put('/einstellungen', data).then((r) => r.data),
+
+  // Demo-Daten (flexibel, admin-gesteuert)
+  generateDemo: (data) => api.post('/demo/generate', data).then((r) => r.data),
 };
 
 // ---- kleine Utility-Funktionen ----

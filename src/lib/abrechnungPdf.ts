@@ -3,8 +3,11 @@
 // Wird im Browser gerendert und per "Drucken -> Als PDF speichern" exportiert
 // ============================================================
 
-import type { Objekt } from './types'
+import type { Objekt, Branding } from './types'
 import type { MieterAbrechnung } from './calc'
+import { logoImgTag } from './settings'
+
+const emptyBranding: Branding = { app_name: '', logo_data_url: '' }
 
 function fmtEuro(n: number): string {
   return (n ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -52,7 +55,7 @@ const styles = `
 </style>
 `
 
-export function generateAbrechnungHtml(objekt: Objekt, a: MieterAbrechnung, jahr: number, vorjahr?: MieterAbrechnung | null): string {
+export function generateAbrechnungHtml(objekt: Objekt, a: MieterAbrechnung, jahr: number, vorjahr?: MieterAbrechnung | null, branding: Branding = emptyBranding): string {
   const m = a.mieter
   const mieterName = m ? `${m.anrede || ''} ${m.vorname || ''} ${m.nachname}`.trim() : '—'
 
@@ -90,6 +93,7 @@ export function generateAbrechnungHtml(objekt: Objekt, a: MieterAbrechnung, jahr
   <body>
     <div class="letterhead">
       <div>
+        ${branding.logo_data_url ? `<div style="margin-bottom:6px;">${logoImgTag(branding, 46)}</div>` : ''}
         <h1>Nebenkostenabrechnung ${jahr}</h1>
         <div class="sub">${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort}</div>
         <div class="sub">Erstellt gemäß § 2 BetrKV und § 7/§ 8 HeizkostenV (30 % Fläche / 70 % Verbrauch)</div>

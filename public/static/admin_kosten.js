@@ -61,6 +61,7 @@ async function loadKosten() {
                 </td>
                 <td class="flex gap-2 justify-end">
                   <button class="text-blue-600 hover:underline text-xs save-kosten" data-kostenart-id="${k.id}">Speichern</button>
+                  ${k.verteilerschluessel === 'individuell' ? `<button class="text-emerald-600 hover:underline text-xs" onclick="openAnteileModal(${k.id}, '${escapeHtml(k.bezeichnung).replace(/'/g, "\\'")}')" title="Individuelle Anteile je Wohnung festlegen"><i class="fas fa-percent"></i></button>` : ''}
                   <button class="text-slate-400 hover:text-red-600 text-xs" onclick="deleteKostenartConfirm(${k.id})"><i class="fas fa-trash"></i></button>
                 </td>
               </tr>
@@ -142,4 +143,63 @@ async function deleteKostenartConfirm(id) {
   await API.deleteKostenart(id);
   loadKosten();
   toast('Kostenart gelöscht', 'success');
+}
+
+// ============================================================
+// Individuelle Verteilerschlüssel-Anteile je Wohnung (Verteilerschlüssel "individuell")
+// ============================================================
+async function openAnteileModal(kostenartId, bezeichnung) {
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4';
+  modal.innerHTML = `<div class="bg-white rounded-xl p-6 w-full max-w-lg"><div class="flex items-center justify-center py-10"><div class="spinner"></div></div></div>`;
+  document.body.appendChild(modal);
+
+  let anteile;
+  try {
+    anteile = await API.getIndividuelleAnteile(kostenartId);
+  } catch (err) {
+    modal.innerHTML = `<div class="bg-white rounded-xl p-6 w-full max-w-lg"><p class="text-red-600">${escapeHtml(err.message)}</p><button class="mt-4 px-4 py-2 rounded-lg bg-slate-100" onclick="this.closest('.fixed').remove()">Schließen</button></div>`;
+    return;
+  }
+
+  const summe = anteile.reduce((s, a) => s + (a.anteil_pct || 0), 0);
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <h2 class="text-lg font-bold mb-1"><i class="fas fa-percent text-emerald-600 mr-1"></i> Individuelle Anteile</h2>
+      <p class="text-sm text-slate-500 mb-4">Kostenart: <span class="font-semibold">${escapeHtml(bezeichnung)}</span>. Legen Sie fest, wie diese Kostenart auf die Wohnungen verteilt wird (in %). Bleiben alle Felder auf 0, wird automatisch gleichmäßig auf alle Wohnungen verteilt. Die Werte werden bei der Berechnung automatisch auf 100% normiert.</p>
+      <form id="anteile-form" class="space-y-2">
+        ${anteile.map((a) => `
+          <div class="flex items-center gap-3">
+            <span class="flex-1 text-sm">${escapeHtml(a.bezeichnung)} <span class="text-slate-400 text-xs">(${escapeHtml(a.lage || '')})</span></span>
+            <div class="flex items-center gap-1">
+              <input type="number" step="0.01" min="0" max="100" class="form-input !w-24 text-right anteil-input" data-wohnung-id="${a.wohnung_id}" value="${((a.anteil_pct || 0) * 100).toFixed(2)}">
+              <span class="text-sm text-slate-500">%</span>
+            </div>
+          </div>
+        `).join('')}
+        <div class="text-xs text-slate-400 mt-1">${summe > 0 ? `Aktuelle Summe: ${(summe * 100).toFixed(1)} % (wird automatisch auf 100 % normiert)` : 'Noch keine individuellen Werte gesetzt – aktuell gleichmäßige Verteilung aktiv.'}</div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="px-4 py-2 rounded-lg text-slate-600 bg-slate-100" onclick="this.closest('.fixed').remove()">Abbrechen</button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-white bg-emerald-600 font-semibold">Speichern</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  modal.querySelector('#anteile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const inputs = modal.querySelectorAll('.anteil-input');
+    const payload = Array.from(inputs).map((inp) => ({
+      wohnung_id: Number(inp.dataset.wohnungId),
+      anteil_pct: (Number(inp.value) || 0) / 100,
+    }));
+    try {
+      await API.setIndividuelleAnteile(kostenartId, { anteile: payload });
+      toast('Anteile gespeichert', 'success');
+      modal.remove();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
 }

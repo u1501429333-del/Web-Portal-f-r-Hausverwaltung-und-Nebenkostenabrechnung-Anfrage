@@ -1,26 +1,31 @@
 // ============================================================
-// Dokumenten-Generator: Mietvertrag, Hausordnung, Treppenreinigungsplan
+// Dokumenten-Generator: Mietvertrag, Hausordnung, Treppenreinigungsplan, Wohnungsübergabe
 // Erzeugt druckfertiges HTML (wird im Browser per "Drucken -> Als PDF speichern" exportiert)
 // ============================================================
 
-import type { Objekt, Wohnung, Mieter } from './types'
+import type { Objekt, Wohnung, Mieter, Branding } from './types'
+import { logoImgTag } from './settings'
 
-function fmtDate(d: string | null): string {
+function fmtDate(d: string | null | undefined): string {
   if (!d) return '_______________'
   const dt = new Date(d + 'T00:00:00Z')
   return dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function fmtEuro(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+  return (n ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
+
+const emptyBranding: Branding = { app_name: 'Hausverwaltung Portal', logo_data_url: '' }
 
 const baseStyles = `
   <style>
     @page { size: A4; margin: 20mm 18mm; }
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 12.5px; line-height: 1.55; margin:0; }
-    h1 { font-size: 19px; color: #0f172a; border-bottom: 3px solid #2563eb; padding-bottom: 8px; margin-bottom: 4px;}
+    .doc-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 3px solid #2563eb; padding-bottom: 10px; margin-bottom: 8px; }
+    .doc-header .title-block { flex:1; }
+    h1 { font-size: 19px; color: #0f172a; margin: 0 0 4px 0; }
     h2 { font-size: 14.5px; color: #1e40af; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #2563eb; padding-left: 8px;}
     p { margin: 6px 0; }
     .meta { color:#64748b; font-size: 11px; margin-bottom: 16px; }
@@ -34,19 +39,55 @@ const baseStyles = `
     ol.clauses > li { margin-bottom: 10px; }
     .footer-note { margin-top: 26px; font-size: 10px; color:#94a3b8; border-top:1px dashed #cbd5e1; padding-top:8px;}
     .badge { display:inline-block; background:#dbeafe; color:#1e3a8a; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:600;}
+    .blank-line { display:inline-block; min-width:120px; border-bottom:1px solid #94a3b8; }
+    .fill-box { border:1px solid #cbd5e1; border-radius:4px; min-height: 20px; padding: 4px 6px; background:#f8fafc; }
+    tr.month-sep td { background:#1e40af; color:#fff; font-weight:700; text-align:center; }
+    @media print { .no-print { display:none; } }
   </style>
 `
 
-export function generateMietvertrag(objekt: Objekt, wohnung: Wohnung, mieter: Mieter): string {
+function docHeader(title: string, subline: string, branding: Branding = emptyBranding): string {
+  return `<div class="doc-header">
+    <div class="title-block">
+      <h1>${title}</h1>
+      <p class="meta">${subline}</p>
+    </div>
+    ${branding.logo_data_url ? `<div style="text-align:right;">${logoImgTag(branding, 60)}<div style="font-size:9.5px;color:#64748b;margin-top:2px;">${branding.app_name || ''}</div></div>` : `<div style="text-align:right;font-size:11px;font-weight:700;color:#1e40af;">${branding.app_name || ''}</div>`}
+  </div>`
+}
+
+export function generateMietvertrag(objekt: Objekt, wohnung: Wohnung, mieter: Mieter, branding: Branding = emptyBranding): string {
   const kaltmiete = mieter.kaltmiete_monat || (mieter.kaltmiete_qm || 0) * (wohnung.flaeche_m2 || 0)
   const nkVorauszahlung = mieter.vorauszahlung_nk_monat || 0
-  const gesamtmiete = kaltmiete + nkVorauszahlung
+  const stellplatzMiete = mieter.stellplatz_vorhanden ? mieter.stellplatz_miete || 0 : 0
+  const garageMiete = mieter.garage_vorhanden ? mieter.garage_miete || 0 : 0
+  const gesamtmiete = kaltmiete + nkVorauszahlung + stellplatzMiete + garageMiete
   const mieterName = `${mieter.anrede || ''} ${mieter.vorname || ''} ${mieter.nachname}`.trim()
+
+  const zusatzRaeumeRows: string[] = []
+  if (mieter.stellplatz_vorhanden) {
+    zusatzRaeumeRows.push(`<tr><td>Pkw-Stellplatz${mieter.stellplatz_nr ? ' Nr. ' + mieter.stellplatz_nr : ''}</td><td class="num">${fmtEuro(stellplatzMiete)}/Monat</td></tr>`)
+  }
+  if (mieter.garage_vorhanden) {
+    zusatzRaeumeRows.push(`<tr><td>Garage${mieter.garage_nr ? ' Nr. ' + mieter.garage_nr : ''}</td><td class="num">${fmtEuro(garageMiete)}/Monat</td></tr>`)
+  }
+  if (mieter.keller_vorhanden) {
+    zusatzRaeumeRows.push(`<tr><td>Kellerraum${mieter.keller_nr ? ' Nr. ' + mieter.keller_nr : ''}</td><td class="num">im Mietverhältnis enthalten</td></tr>`)
+  }
+  if (mieter.garten_vorhanden) {
+    zusatzRaeumeRows.push(`<tr><td>Gartenmitbenutzung${mieter.garten_beschreibung ? ' (' + mieter.garten_beschreibung + ')' : ''}</td><td class="num">im Mietverhältnis enthalten</td></tr>`)
+  }
+
+  const schluesselRows = `
+    <tr><td>Wohnungsschlüssel</td><td class="num">nach Übergabeprotokoll</td></tr>
+    <tr><td>Haustürschlüssel</td><td class="num">${mieter.anzahl_hausschluessel || 0} Stück</td></tr>
+    <tr><td>Briefkastenschlüssel</td><td class="num">${mieter.anzahl_briefkastenschluessel || 0} Stück</td></tr>
+    ${mieter.sonstige_schluessel ? `<tr><td>Sonstige Schlüssel</td><td class="num">${mieter.sonstige_schluessel}</td></tr>` : ''}
+  `
 
   return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Mietvertrag ${wohnung.bezeichnung}</title>${baseStyles}</head>
   <body>
-    <h1>Wohnraum-Mietvertrag</h1>
-    <p class="meta">Erstellt automatisch gemäß §§ 535 ff. BGB · Objekt: ${objekt.name}</p>
+    ${docHeader('Wohnraum-Mietvertrag', `Erstellt automatisch gemäß §§ 535 ff. BGB · Objekt: ${objekt.name}`, branding)}
 
     <h2>§ 1 Vertragsparteien</h2>
     <table>
@@ -64,6 +105,8 @@ export function generateMietvertrag(objekt: Objekt, wohnung: Wohnung, mieter: Mi
     <table>
       <tr><th style="width:55%">Nettokaltmiete pro Monat</th><td>${fmtEuro(kaltmiete)}</td></tr>
       <tr><th>Vorauszahlung Betriebs-/Nebenkosten pro Monat</th><td>${fmtEuro(nkVorauszahlung)}</td></tr>
+      ${mieter.stellplatz_vorhanden ? `<tr><th>Stellplatz${mieter.stellplatz_nr ? ' Nr. ' + mieter.stellplatz_nr : ''}</th><td>${fmtEuro(stellplatzMiete)}</td></tr>` : ''}
+      ${mieter.garage_vorhanden ? `<tr><th>Garage${mieter.garage_nr ? ' Nr. ' + mieter.garage_nr : ''}</th><td>${fmtEuro(garageMiete)}</td></tr>` : ''}
       <tr><th><b>Gesamtmiete pro Monat</b></th><td><b>${fmtEuro(gesamtmiete)}</b></td></tr>
     </table>
     <p class="small">Die Nebenkostenvorauszahlung wird jährlich gemäß Betriebskostenverordnung (BetrKV) und Heizkostenverordnung (HeizkostenV) abgerechnet. Über- oder Unterzahlungen werden mit der jährlichen Nebenkostenabrechnung ausgeglichen.</p>
@@ -83,16 +126,30 @@ export function generateMietvertrag(objekt: Objekt, wohnung: Wohnung, mieter: Mi
     <h2>§ 7 Betriebskosten (§ 2 BetrKV)</h2>
     <p>Zu den umlagefähigen Betriebskosten zählen insbesondere: Grundsteuer, Wasserversorgung, Entwässerung, Heizung und Warmwasser (Verteilung nach § 7/§ 8 HeizkostenV, 30 % nach Wohnfläche und 70 % nach Verbrauch), Aufzug, Straßenreinigung, Müllabfuhr, Gebäudereinigung, Gartenpflege, Beleuchtung, Schornsteinreinigung, Sach- und Haftpflichtversicherung, Hauswart, Gemeinschaftsantenne sowie sonstige Betriebskosten.</p>
 
-    <h2>§ 8 Instandhaltung und Schönheitsreparaturen</h2>
+    <h2>§ 8 Nebenräume, Stellplatz, Garage, Keller, Garten</h2>
+    <p>Zusätzlich zur Wohnung werden dem Mieter folgende Neben­räume/-flächen zur Nutzung überlassen:</p>
+    <table>
+      <tr><th style="width:60%">Bezeichnung</th><th>Kosten/Hinweis</th></tr>
+      ${zusatzRaeumeRows.length ? zusatzRaeumeRows.join('') : '<tr><td colspan="2" class="small">Keine zusätzlichen Nebenräume/-flächen vereinbart.</td></tr>'}
+    </table>
+
+    <h2>§ 9 Schlüsselübergabe</h2>
+    <table>
+      <tr><th style="width:60%">Schlüsselart</th><th>Anzahl</th></tr>
+      ${schluesselRows}
+    </table>
+    <p class="small">Die genaue Schlüsselanzahl und der Zustand der Wohnung werden zusätzlich im separaten Wohnungsübergabeprotokoll dokumentiert.</p>
+
+    <h2>§ 10 Instandhaltung und Schönheitsreparaturen</h2>
     <p>Der Mieter ist verpflichtet, die Mieträume pflegend zu behandeln. Schönheitsreparaturen richten sich nach den gesetzlichen Bestimmungen (§ 535 BGB) und aktueller BGH-Rechtsprechung.</p>
 
-    <h2>§ 9 Hausordnung</h2>
+    <h2>§ 11 Hausordnung</h2>
     <p>Die dem Mietvertrag als Anlage beigefügte Hausordnung ist Bestandteil dieses Vertrages.</p>
 
-    <h2>§ 10 Kündigung</h2>
+    <h2>§ 12 Kündigung</h2>
     <p>Die Kündigungsfristen richten sich nach § 573c BGB. Die gesetzliche Kündigungsfrist für den Mieter beträgt drei Monate.</p>
 
-    <h2>§ 11 Sonstige Vereinbarungen</h2>
+    <h2>§ 13 Sonstige Vereinbarungen</h2>
     <p>Änderungen und Ergänzungen dieses Vertrages bedürfen der Schriftform. Sollte eine Bestimmung dieses Vertrages unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.</p>
 
     <div class="sig-row">
@@ -103,11 +160,10 @@ export function generateMietvertrag(objekt: Objekt, wohnung: Wohnung, mieter: Mi
   </body></html>`
 }
 
-export function generateHausordnung(objekt: Objekt): string {
+export function generateHausordnung(objekt: Objekt, branding: Branding = emptyBranding): string {
   return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Hausordnung</title>${baseStyles}</head>
   <body>
-    <h1>Hausordnung</h1>
-    <p class="meta">${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort}</p>
+    ${docHeader('Hausordnung', `${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort}`, branding)}
 
     <p>Diese Hausordnung regelt das Zusammenleben aller Bewohner und ist Bestandteil des Mietvertrages. Sie dient der Ordnung, Sicherheit und dem guten nachbarschaftlichen Miteinander im Haus.</p>
 
@@ -115,7 +171,7 @@ export function generateHausordnung(objekt: Objekt): string {
     <p>Mittagsruhe: 13:00 – 15:00 Uhr · Nachtruhe: 22:00 – 07:00 Uhr. In diesen Zeiten ist auf Zimmerlautstärke zu achten (Musik, Fernsehen, Haushaltsgeräte, Feiern).</p>
 
     <h2>2. Treppenhaus und Gemeinschaftsflächen</h2>
-    <p>Treppenhaus, Hauseingang und Gemeinschaftsflächen sind aus Brandschutzgründen freizuhalten (keine Schuhe, Fahrräder, Kinderwagen dauerhaft abstellen). Die Reinigung erfolgt gemäß dem Treppenreinigungsplan (siehe separates Dokument).</p>
+    <p>Treppenhaus, Hauseingang und Gemeinschaftsflächen sind aus Brandschutzgründen freizuhalten (keine Schuhe, Fahrräder, Kinderwagen dauerhaft abstellen). Die Reinigung erfolgt im wöchentlichen Wechsel gemäß dem Treppenreinigungsplan (siehe separates Dokument).</p>
 
     <h2>3. Müllentsorgung</h2>
     <p>Müll ist ausschließlich in den dafür vorgesehenen Behältern zu entsorgen. Mülltrennung (Restmüll, Papier, Verpackung, Glas, Bio) ist verpflichtend. Sperrmüll darf nicht im Hausflur oder Hof gelagert werden.</p>
@@ -126,41 +182,112 @@ export function generateHausordnung(objekt: Objekt): string {
     <h2>5. Waschküche / Gemeinschaftswaschmaschine</h2>
     <p>Sofern vorhanden, ist die Nutzung der Waschküche nach dem ausgehängten Belegungsplan zu koordinieren. Nach Benutzung ist die Waschküche sauber zu verlassen.</p>
 
-    <h2>6. Balkone, Fenster und Außenbereiche</h2>
+    <h2>6. Stellplätze, Garagen, Keller und Garten</h2>
+    <p>Stellplätze und Garagen dürfen nur mit zugelassenen Kraftfahrzeugen des jeweiligen Nutzers belegt werden. Kellerräume sind trocken und ordentlich zu halten. Gemeinschaftlich genutzte Gartenflächen sind pflegend zu behandeln; individuelle Beete bedürfen der Abstimmung mit der Hausverwaltung.</p>
+
+    <h2>7. Balkone, Fenster und Außenbereiche</h2>
     <p>Blumengießen und Ausklopfen von Teppichen dürfen andere Bewohner nicht beeinträchtigen. Das Füttern von Tauben und wilden Tieren ist zu unterlassen.</p>
 
-    <h2>7. Tierhaltung</h2>
+    <h2>8. Tierhaltung</h2>
     <p>Die Haltung von Haustieren bedarf grundsätzlich der Zustimmung des Vermieters, soweit im Mietvertrag nicht abweichend geregelt. Hunde sind im Treppenhaus an der Leine zu führen.</p>
 
-    <h2>8. Sicherheit</h2>
+    <h2>9. Sicherheit</h2>
     <p>Haus- und Wohnungstüren sind stets zu verschließen. Fremden Personen ist der Zutritt zum Haus nicht ohne triftigen Grund zu gewähren. Rauchen im Treppenhaus ist aus Brandschutzgründen untersagt.</p>
 
-    <h2>9. Instandhaltungsmängel</h2>
+    <h2>10. Instandhaltungsmängel</h2>
     <p>Mängel und Schäden am Gemeinschaftseigentum sind unverzüglich der Hausverwaltung zu melden.</p>
 
     <p class="footer-note">Diese Hausordnung ist Bestandteil des Mietvertrages. Verstöße können nach vorheriger Abmahnung zu mietrechtlichen Konsequenzen führen. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
   </body></html>`
 }
 
-export function generateReinigungsplan(objekt: Objekt, wohnungen: Wohnung[]): string {
-  const wochen = ['KW 1', 'KW 2', 'KW 3', 'KW 4', 'KW 5', 'KW 6', 'KW 7', 'KW 8']
-  const rows = wochen
-    .map((w, i) => {
-      const wohnung = wohnungen[i % wohnungen.length]
-      return `<tr><td>${w}</td><td>${wohnung ? wohnung.bezeichnung + (wohnung.lage ? ' (' + wohnung.lage + ')' : '') : '—'}</td><td>Treppenhaus, Hauseingang, Klingelanlage</td></tr>`
-    })
-    .join('')
+// -------------------------------------------------------------
+// Treppenreinigungsplan: ECHTER wöchentlicher Rotationsplan
+// Jede Kalenderwoche (Montag–Sonntag) des gewählten Jahres ist genau
+// EINE Wohnung zuständig; die Zuständigkeit rotiert durchgehend
+// wohnungenweise (nicht monatlich!). Bei Änderung der Wohnungsanzahl
+// wird der Plan automatisch neu erzeugt (siehe Routen: auto-regeneration).
+// -------------------------------------------------------------
 
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Treppenreinigungsplan</title>${baseStyles}</head>
+function mondayOfWeekUTC(d: Date): Date {
+  const day = d.getUTCDay()
+  const diff = (day === 0 ? -6 : 1) - day
+  const res = new Date(d)
+  res.setUTCDate(d.getUTCDate() + diff)
+  res.setUTCHours(0, 0, 0, 0)
+  return res
+}
+
+function isoWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+interface KalenderWoche {
+  kw: number
+  start: Date
+  end: Date
+}
+
+function getIsoWeeksOfYear(year: number): KalenderWoche[] {
+  const weeks: KalenderWoche[] = []
+  let cur = mondayOfWeekUTC(new Date(Date.UTC(year, 0, 1)))
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const thursday = new Date(cur)
+    thursday.setUTCDate(cur.getUTCDate() + 3)
+    if (thursday.getUTCFullYear() > year) break
+    if (thursday.getUTCFullYear() === year) {
+      const end = new Date(cur)
+      end.setUTCDate(cur.getUTCDate() + 6)
+      weeks.push({ kw: isoWeekNumber(cur), start: new Date(cur), end })
+    }
+    cur = new Date(cur)
+    cur.setUTCDate(cur.getUTCDate() + 7)
+  }
+  return weeks
+}
+
+const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+
+function fmtKurzDatum(d: Date): string {
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+}
+
+export function generateReinigungsplan(objekt: Objekt, wohnungen: Wohnung[], branding: Branding = emptyBranding, jahr?: number): string {
+  const year = jahr || new Date().getFullYear()
+  const weeks = getIsoWeeksOfYear(year)
+  const n = wohnungen.length
+
+  let rows = ''
+  let currentMonth = -1
+  weeks.forEach((w, i) => {
+    const month = w.start.getUTCMonth()
+    if (month !== currentMonth) {
+      currentMonth = month
+      rows += `<tr class="month-sep"><td colspan="4">${MONATE[month]} ${year}</td></tr>`
+    }
+    const wohnung = n > 0 ? wohnungen[i % n] : null
+    rows += `<tr>
+      <td>KW ${w.kw}</td>
+      <td>${fmtKurzDatum(w.start)} – ${fmtKurzDatum(w.end)}</td>
+      <td>${wohnung ? `<b>${wohnung.bezeichnung}</b>${wohnung.lage ? ' (' + wohnung.lage + ')' : ''}` : '—'}</td>
+      <td>Treppenhaus, Hauseingang, Klingelanlage</td>
+    </tr>`
+  })
+
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Treppenreinigungsplan ${year}</title>${baseStyles}</head>
   <body>
-    <h1>Treppenreinigungsplan</h1>
-    <p class="meta">${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort} · Rotationsplan im wöchentlichen Wechsel</p>
+    ${docHeader(`Treppenreinigungsplan ${year}`, `${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort} · Wöchentlicher Rotationsplan (jede Woche wechselt die zuständige Wohnung)`, branding)}
 
-    <p>Die Reinigung des Treppenhauses erfolgt im wöchentlichen Turnus durch die Bewohner der jeweiligen Wohnung. Zu reinigen sind: Treppenstufen, Handlauf, Fensterbänke im Treppenhaus, Hauseingangsbereich sowie die Klingel-/Briefkastenanlage.</p>
+    <p>Die Reinigung des Treppenhauses erfolgt <b>jede Woche</b> durch die Bewohner der jeweils zuständigen Wohnung. Die Zuständigkeit wechselt wöchentlich (Montag bis Sonntag) im durchgehenden Rotationsverfahren zwischen allen ${n} Wohnungen des Objekts. Zu reinigen sind: Treppenstufen, Handlauf, Fensterbänke im Treppenhaus, Hauseingangsbereich sowie die Klingel-/Briefkastenanlage.</p>
 
-    <h2>Rotationsplan (Beispiel für 8 Kalenderwochen, danach Wiederholung)</h2>
+    <h2>Rotationsplan Kalenderjahr ${year} (${weeks.length} Kalenderwochen)</h2>
     <table>
-      <tr><th>Kalenderwoche</th><th>Zuständige Wohnung</th><th>Aufgabenbereich</th></tr>
+      <tr><th>KW</th><th>Zeitraum</th><th>Zuständige Wohnung</th><th>Aufgabenbereich</th></tr>
       ${rows}
     </table>
 
@@ -173,6 +300,91 @@ export function generateReinigungsplan(objekt: Objekt, wohnungen: Wohnung[]): st
       <li>Klingel- und Briefkastenanlage abwischen</li>
     </ul>
 
-    <p class="footer-note">Bei Verhinderung ist rechtzeitig für eine Vertretung durch eine andere Partei zu sorgen oder die Hausverwaltung zu informieren. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
+    <p class="footer-note">Bei Verhinderung ist rechtzeitig für eine Vertretung durch eine andere Partei zu sorgen oder die Hausverwaltung zu informieren. Der Plan wird automatisch aktualisiert, sobald neue Wohnungen hinzukommen. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
+  </body></html>`
+}
+
+// -------------------------------------------------------------
+// Wohnungsübergabeprotokoll (Ein- oder Auszug)
+// -------------------------------------------------------------
+export function generateWohnungsuebergabe(objekt: Objekt, wohnung: Wohnung, mieter: Mieter, branding: Branding = emptyBranding, art: 'einzug' | 'auszug' = 'einzug'): string {
+  const mieterName = `${mieter.anrede || ''} ${mieter.vorname || ''} ${mieter.nachname}`.trim()
+  const raeume = ['Wohnzimmer', 'Schlafzimmer', 'Küche', 'Bad/WC', 'Flur/Diele', 'Balkon/Terrasse', 'Weiterer Raum']
+
+  const raumRows = raeume
+    .map(
+      (r) => `<tr><td>${r}</td><td class="fill-box">&nbsp;</td><td class="fill-box">&nbsp;</td></tr>`
+    )
+    .join('')
+
+  const zaehlerRows = ['Strom (allgemein)', 'Heizungs-Wärmemengenzähler (WMZ)', 'Warmwasserzähler', 'Kaltwasserzähler', 'Gaszähler (falls vorhanden)']
+    .map((z) => `<tr><td>${z}</td><td class="fill-box">&nbsp;</td><td class="fill-box">Zählernr.:&nbsp;</td></tr>`)
+    .join('')
+
+  const schluesselTable = `
+    <table>
+      <tr><th style="width:60%">Schlüsselart</th><th>Anzahl übergeben</th></tr>
+      <tr><td>Wohnungsschlüssel</td><td class="fill-box">&nbsp;</td></tr>
+      <tr><td>Haustürschlüssel</td><td>${mieter.anzahl_hausschluessel || 0} Stück</td></tr>
+      <tr><td>Briefkastenschlüssel</td><td>${mieter.anzahl_briefkastenschluessel || 0} Stück</td></tr>
+      ${mieter.keller_vorhanden ? `<tr><td>Kellerschlüssel${mieter.keller_nr ? ' (Keller Nr. ' + mieter.keller_nr + ')' : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${mieter.garage_vorhanden ? `<tr><td>Garagenschlüssel/-fernbedienung${mieter.garage_nr ? ' (Garage Nr. ' + mieter.garage_nr + ')' : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${mieter.sonstige_schluessel ? `<tr><td>${mieter.sonstige_schluessel}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+    </table>
+  `
+
+  const zusatzTable = `
+    <table>
+      <tr><th style="width:60%">Nebenraum / -fläche</th><th>Zustand / Bemerkung</th></tr>
+      ${mieter.stellplatz_vorhanden ? `<tr><td>Pkw-Stellplatz${mieter.stellplatz_nr ? ' Nr. ' + mieter.stellplatz_nr : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${mieter.garage_vorhanden ? `<tr><td>Garage${mieter.garage_nr ? ' Nr. ' + mieter.garage_nr : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${mieter.keller_vorhanden ? `<tr><td>Kellerraum${mieter.keller_nr ? ' Nr. ' + mieter.keller_nr : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${mieter.garten_vorhanden ? `<tr><td>Gartenfläche${mieter.garten_beschreibung ? ' (' + mieter.garten_beschreibung + ')' : ''}</td><td class="fill-box">&nbsp;</td></tr>` : ''}
+      ${!mieter.stellplatz_vorhanden && !mieter.garage_vorhanden && !mieter.keller_vorhanden && !mieter.garten_vorhanden ? '<tr><td colspan="2" class="small">Keine zusätzlichen Nebenräume/-flächen vereinbart.</td></tr>' : ''}
+    </table>
+  `
+
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Wohnungsübergabeprotokoll ${wohnung.bezeichnung}</title>${baseStyles}</head>
+  <body>
+    ${docHeader(`Wohnungsübergabeprotokoll (${art === 'einzug' ? 'Einzug' : 'Auszug'})`, `${objekt.name} · ${objekt.strasse}, ${objekt.plz} ${objekt.ort}`, branding)}
+
+    <h2>1 · Beteiligte</h2>
+    <table>
+      <tr><th style="width:30%">Vermieter / Hausverwaltung</th><td>${objekt.vermieter_name || '—'}</td></tr>
+      <tr><th>Mieter</th><td>${mieterName}</td></tr>
+      <tr><th>Wohnung</th><td>${wohnung.bezeichnung} (${wohnung.lage || ''}), ${wohnung.flaeche_m2} m²</td></tr>
+      <tr><th>Datum der Übergabe</th><td class="fill-box">&nbsp;</td></tr>
+      <tr><th>Art der Übergabe</th><td>☐ Einzug &nbsp;&nbsp;&nbsp; ☐ Auszug</td></tr>
+    </table>
+
+    <h2>2 · Zählerstände bei Übergabe</h2>
+    <table>
+      <tr><th style="width:45%">Zählerart</th><th>Zählerstand</th><th>Zählernummer</th></tr>
+      ${zaehlerRows}
+    </table>
+
+    <h2>3 · Zustand der Räume</h2>
+    <table>
+      <tr><th style="width:30%">Raum</th><th>Zustand (Wände/Boden/Fenster)</th><th>Festgestellte Mängel</th></tr>
+      ${raumRows}
+    </table>
+
+    <h2>4 · Schlüsselübergabe</h2>
+    ${schluesselTable}
+
+    <h2>5 · Nebenräume / -flächen (Stellplatz, Garage, Keller, Garten)</h2>
+    ${zusatzTable}
+
+    <h2>6 · Sonstige Vereinbarungen / Bemerkungen</h2>
+    <table><tr><td class="fill-box" style="min-height:70px;">&nbsp;</td></tr></table>
+
+    <h2>7 · Bestätigung</h2>
+    <p class="small">Beide Parteien bestätigen mit ihrer Unterschrift die Richtigkeit der vorstehenden Angaben. Dieses Protokoll ist Bestandteil des Mietverhältnisses und wird beiden Parteien in Kopie ausgehändigt.</p>
+
+    <div class="sig-row">
+      <div class="sig-box">Ort, Datum, Unterschrift Vermieter/Hausverwaltung</div>
+      <div class="sig-box">Ort, Datum, Unterschrift Mieter</div>
+    </div>
+    <p class="footer-note">Erstellt am ${new Date().toLocaleDateString('de-DE')} · Dient als Nachweis für spätere Kautions- bzw. Schadensabrechnung.</p>
   </body></html>`
 }

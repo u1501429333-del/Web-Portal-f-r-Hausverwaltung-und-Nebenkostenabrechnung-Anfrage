@@ -9,6 +9,8 @@ import { zaehlerRoutes } from './routes/zaehler'
 import { kostenRoutes } from './routes/kosten'
 import { abrechnungRoutes } from './routes/abrechnung'
 import { dokumenteRoutes } from './routes/dokumente'
+import { einstellungenRoutes } from './routes/einstellungen'
+import { demoRoutes } from './routes/demo'
 
 const app = new Hono<AppContext>()
 
@@ -24,6 +26,8 @@ app.route('/api/zaehler', zaehlerRoutes)
 app.route('/api/kosten', kostenRoutes)
 app.route('/api/abrechnung', abrechnungRoutes)
 app.route('/api/dokumente', dokumenteRoutes)
+app.route('/api/einstellungen', einstellungenRoutes)
+app.route('/api/demo', demoRoutes)
 
 app.get('*', (c) => {
   return c.html(indexHtml)
@@ -56,6 +60,7 @@ const indexHtml = `<!DOCTYPE html>
   <script src="/static/admin_kosten.js"></script>
   <script src="/static/admin_abrechnung.js"></script>
   <script src="/static/admin_dokumente.js"></script>
+  <script src="/static/admin_einstellungen.js"></script>
   <script src="/static/mieter_portal.js"></script>
 </body>
 </html>`
