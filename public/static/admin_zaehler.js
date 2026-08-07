@@ -24,9 +24,18 @@ async function loadZaehlerstaende() {
   };
   daten.forEach((z) => gruppen[z.typ]?.items.push(z));
 
+  const ampelDot = (a) => {
+    const color = a === 'gruen' ? 'bg-emerald-500' : a === 'gelb' ? 'bg-amber-400' : 'bg-red-500';
+    const title = a === 'gruen' ? 'Aktuell abgelesen' : a === 'gelb' ? 'Ablesung älter/ungenau' : 'Keine Ablesung vorhanden';
+    return `<span class="inline-block w-2.5 h-2.5 rounded-full ${color} mr-1.5" title="${title}"></span>`;
+  };
+
   container.innerHTML = `
     <div class="mb-4 flex items-center justify-between">
-      <p class="text-slate-500 text-sm">Zählerjahr <b>${jahr}</b> — Verbrauch = Zählerstand ${jahr} − Zählerstand ${jahr - 1}</p>
+      <p class="text-slate-500 text-sm">Zählerjahr <b>${jahr}</b> — Verbrauch = Zählerstand ${jahr} − Zählerstand ${jahr - 1}. <span class="ml-2">${ampelDot('gruen')}aktuell ${ampelDot('gelb')}veraltet ${ampelDot('rot')}fehlt</span></p>
+      <a href="${API.zaehlerCsvUrl(objektId, jahr)}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+        <i class="fas fa-file-csv mr-1"></i> CSV-Export für Steuerberater
+      </a>
     </div>
     ${Object.entries(gruppen).map(([typ, grp]) => grp.items.length ? `
       <div class="card p-5 mb-5">
@@ -34,7 +43,7 @@ async function loadZaehlerstaende() {
         <div class="overflow-x-auto">
           <table class="data-table w-full text-sm">
             <thead><tr>
-              <th>Zähler</th><th>Wohnung</th>
+              <th></th><th>Zähler</th><th>Wohnung</th>
               <th class="text-right">Stand ${jahr - 1}</th>
               <th class="text-right">Stand ${jahr}</th>
               <th class="text-right">Verbrauch ${jahr}</th>
@@ -49,6 +58,7 @@ async function loadZaehlerstaende() {
                   ? z.verbrauch_aktuell - z.verbrauch_vorjahr : null;
                 const diffPct = diff != null && z.verbrauch_vorjahr ? (diff / z.verbrauch_vorjahr) * 100 : null;
                 return `<tr>
+                  <td>${ampelDot(z.ablesung_ampel || 'rot')}</td>
                   <td class="font-medium">${escapeHtml(z.bezeichnung)}${z.ebene ? ' <span class="text-xs text-slate-400">(' + escapeHtml(z.ebene) + ')</span>' : ''}</td>
                   <td>${z.wohnung_bezeichnung ? escapeHtml(z.wohnung_bezeichnung) + ' · ' + escapeHtml(z.wohnung_lage || '') : '<span class="text-slate-400">Gebäude</span>'}</td>
                   <td class="text-right text-slate-500">${z.stand_vorjahr != null ? fmtNum(z.stand_vorjahr) : '—'}</td>

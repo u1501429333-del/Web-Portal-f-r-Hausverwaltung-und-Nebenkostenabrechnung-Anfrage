@@ -12,9 +12,57 @@ async function loadEinstellungen() {
   const container = document.getElementById('est-content');
   const branding = await API.getEinstellungen();
   AppState.branding = branding;
+  const erw = await API.getEinstellungenErweitert();
 
   container.innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-6">
+        <h3 class="font-bold text-slate-700 mb-1"><i class="fas fa-fire text-orange-600 mr-1"></i> Heizkosten-Verteilung (HeizkostenV §7/§8) &amp; §9a-Zuschlag</h3>
+        <p class="text-sm text-slate-500 mb-4">Gesetzlich vorgeschrieben ist eine verbrauchsabhängige Verteilung von <b>50–70 %</b> für Heizung und Warmwasser (§7/§8 HeizkostenV); der Rest wird nach Wohnfläche verteilt. Fehlt die Verbrauchserfassung (z. B. defekter Zähler), kann gem. §9a ein Zuschlag von bis zu 15 % erhoben werden.</p>
+        <form id="heizkosten-form" class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-500">Verbrauchsabhängiger Anteil Heizung/Warmwasser: <span id="va-value" class="text-blue-700 font-bold">${Math.round((erw.heizkosten_verbrauch_anteil ?? 0.7) * 100)}%</span> / Grundanteil (Fläche): <span id="ga-value">${Math.round((1 - (erw.heizkosten_verbrauch_anteil ?? 0.7)) * 100)}%</span></label>
+            <input class="w-full" type="range" name="heizkosten_verbrauch_anteil" min="50" max="70" step="1" value="${Math.round((erw.heizkosten_verbrauch_anteil ?? 0.7) * 100)}">
+            <div class="flex justify-between text-xs text-slate-400"><span>50% (Minimum)</span><span>70% (üblich, Standard)</span></div>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-500">§9a-Zuschlag bei fehlender Verbrauchserfassung (%)</label>
+            <input class="form-input" type="number" name="zuschlag_9a_pct" min="0" max="15" step="1" value="${erw.zuschlag_9a_pct ?? 0}">
+            <p class="text-xs text-slate-400 mt-1">0 = kein Zuschlag (Normalfall bei funktionierenden Zählern). Erhöht die Heizkosten vor der Verteilung.</p>
+          </div>
+          <button type="submit" class="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold"><i class="fas fa-save mr-1"></i> Speichern</button>
+        </form>
+      </div>
+
+      <div class="card p-6">
+        <h3 class="font-bold text-slate-700 mb-1"><i class="fas fa-lock text-slate-600 mr-1"></i> PIN-Schutz, Erinnerungen &amp; Steuerberater-Kontakt</h3>
+        <p class="text-sm text-slate-500 mb-4">Zusätzlicher PIN-Schutz für sensible Admin-Bereiche (ergänzt den regulären Login, ersetzt ihn nicht). Zudem Fristen für Ablese- und Abrechnungserinnerungen.</p>
+        <form id="erweitert-form" class="space-y-4">
+          <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" name="pin_schutz_aktiv" ${erw.pin_schutz_aktiv ? 'checked' : ''}> PIN-Schutz aktivieren
+          </label>
+          <div>
+            <label class="text-xs font-semibold text-slate-500">${erw.pin_gesetzt ? 'Neuen PIN setzen (leer lassen = unverändert)' : 'PIN festlegen'}</label>
+            <input class="form-input" type="password" name="pin_code" placeholder="${erw.pin_gesetzt ? '•••• (bereits gesetzt)' : 'z.B. 1234'}" maxlength="12">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-500">Erinnerung Ablesung (Tage vorher)</label>
+              <input class="form-input" type="number" name="erinnerung_ablesung_tage_vorher" min="1" max="90" value="${erw.erinnerung_ablesung_tage_vorher ?? 14}">
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-500">Frist Abrechnung (Monate)</label>
+              <input class="form-input" type="number" name="erinnerung_abrechnung_frist_monate" min="1" max="18" value="${erw.erinnerung_abrechnung_frist_monate ?? 12}">
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-500">E-Mail Steuerberater (für Export/Unterlagen-Versand)</label>
+            <input class="form-input" type="email" name="vermieter_email_steuerberater" value="${escapeHtml(erw.vermieter_email_steuerberater || '')}" placeholder="steuerberater@kanzlei.de">
+          </div>
+          <button type="submit" class="bg-slate-700 text-white px-5 py-2 rounded-lg text-sm font-semibold"><i class="fas fa-save mr-1"></i> Speichern</button>
+        </form>
+      </div>
+
       <div class="card p-6">
         <h3 class="font-bold text-slate-700 mb-1"><i class="fas fa-signature text-blue-600 mr-1"></i> App-Name &amp; Logo</h3>
         <p class="text-sm text-slate-500 mb-4">Der App-Name und das Logo erscheinen im Menü, auf der Login-Seite und im Briefkopf aller erzeugten Dokumente (Nebenkostenabrechnung, Mietvertrag, Hausordnung, Wohnungsübergabe, Reinigungsplan).</p>
@@ -66,6 +114,49 @@ async function loadEinstellungen() {
       </div>
     </div>
   `;
+
+  // ---- Heizkosten-Formular (Live-Anzeige beim Schieben des Reglers) ----
+  const vaRange = container.querySelector('input[name="heizkosten_verbrauch_anteil"]');
+  if (vaRange) {
+    vaRange.addEventListener('input', () => {
+      document.getElementById('va-value').textContent = vaRange.value + '%';
+      document.getElementById('ga-value').textContent = (100 - Number(vaRange.value)) + '%';
+    });
+  }
+  document.getElementById('heizkosten-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    try {
+      await API.updateEinstellungenErweitert({
+        heizkosten_verbrauch_anteil: Number(fd.heizkosten_verbrauch_anteil) / 100,
+        zuschlag_9a_pct: Number(fd.zuschlag_9a_pct) || 0,
+      });
+      toast('Heizkosten-Einstellungen gespeichert', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  // ---- PIN-Schutz / Erinnerungen / Steuerberater-Formular ----
+  document.getElementById('erweitert-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = {
+      pin_schutz_aktiv: fd.has('pin_schutz_aktiv'),
+      erinnerung_ablesung_tage_vorher: Number(fd.get('erinnerung_ablesung_tage_vorher')) || 14,
+      erinnerung_abrechnung_frist_monate: Number(fd.get('erinnerung_abrechnung_frist_monate')) || 12,
+      vermieter_email_steuerberater: fd.get('vermieter_email_steuerberater') || '',
+    };
+    const pin = fd.get('pin_code');
+    if (pin) data.pin_code = pin;
+    try {
+      await API.updateEinstellungenErweitert(data);
+      toast('Einstellungen gespeichert', 'success');
+      await loadEinstellungen();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
 
   // ---- Branding-Formular ----
   let pendingLogoDataUrl = branding.logo_data_url || '';

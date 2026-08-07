@@ -28,9 +28,10 @@ async function loadDashboard() {
   const container = document.getElementById('dash-content');
 
   try {
-    const [wohnungen, verteilung] = await Promise.all([
+    const [wohnungen, verteilung, erweitert] = await Promise.all([
       API.listWohnungen(objektId),
       API.getVerteilung(objektId, jahr).catch(() => null),
+      API.getDashboardErweitert(objektId, jahr).catch(() => null),
     ]);
 
     const objekt = currentObjekt();
@@ -44,6 +45,11 @@ async function loadDashboard() {
 
     const gesamtkosten = verteilung?.gesamtkosten || 0;
     const diffPct = vorjahrGesamt ? ((gesamtkosten - vorjahrGesamt) / vorjahrGesamt) * 100 : null;
+
+    const leerstand = erweitert?.leerstand;
+    const mietende = erweitert?.mietende_warnungen || [];
+    const nachzahl = erweitert?.nachzahlungen;
+    const trend = erweitert?.kostentrend;
 
     container.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -66,6 +72,27 @@ async function loadDashboard() {
         </div>
       </div>
 
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="card p-5 ${leerstand?.anzahl ? 'border-l-4 border-amber-500' : ''}">
+          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-house-circle-xmark mr-1"></i> Leerstand</div>
+          <div class="text-2xl font-bold ${leerstand?.anzahl ? 'text-amber-600' : 'text-slate-800'}">${leerstand?.anzahl ?? 0} / ${leerstand?.von_wohnungen_gesamt ?? wohnungen.length}</div>
+          <div class="text-xs text-slate-500 mt-1">${leerstand ? fmtPct((leerstand.quote_pct || 0) / 100) + ' der Fläche' : '—'}</div>
+        </div>
+        <div class="card p-5 ${nachzahl?.anzahl_nachzahlung ? 'border-l-4 border-red-500' : ''}">
+          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-hand-holding-dollar mr-1"></i> Nachzahlungen ${jahr}</div>
+          <div class="text-2xl font-bold text-red-600">${fmtEuro(nachzahl?.summe_nachzahlung || 0)}</div>
+          <div class="text-xs text-slate-500 mt-1">${nachzahl?.anzahl_nachzahlung ?? 0} Mieter · Guthaben: ${fmtEuro(nachzahl?.summe_guthaben || 0)}</div>
+        </div>
+        <div class="card p-5 col-span-2">
+          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-triangle-exclamation mr-1 text-amber-500"></i> Mietende-Warnungen (nächste 90 Tage)</div>
+          ${mietende.length ? `
+            <div class="max-h-24 overflow-y-auto text-sm space-y-1 mt-1">
+              ${mietende.map((m) => `<div><b>${escapeHtml(m.mieter_name)}</b> (${escapeHtml(m.wohnung_bezeichnung)}) — endet in ${m.tage_bis_mietende} Tag(en), ${fmtDate(m.mietende)}</div>`).join('')}
+            </div>
+          ` : `<div class="text-sm text-slate-400 mt-2">Keine anstehenden Mietenden.</div>`}
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="card p-5">
           <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-chart-pie text-blue-600 mr-1"></i> Kostenverteilung nach Art</h3>
@@ -76,6 +103,14 @@ async function loadDashboard() {
           <canvas id="chart-wohnungen" height="220"></canvas>
         </div>
       </div>
+
+      ${trend && trend.punkte && trend.punkte.length ? `
+      <div class="card p-5 mt-6">
+        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-chart-line text-blue-600 mr-1"></i> 3-Jahres-Kostentrend mit Regressionsprognose</h3>
+        <canvas id="chart-trend" height="180"></canvas>
+        <p class="text-xs text-slate-500 mt-2">Lineare Regression: Änderung ca. ${fmtEuro(trend.steigung_pro_jahr)} pro Jahr. Prognose ${jahr + 1}: <b>${fmtEuro(trend.prognose_naechstes_jahr)}</b></p>
+      </div>
+      ` : ''}
 
       <div class="card p-5 mt-6">
         <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-list text-blue-600 mr-1"></i> Wohnungsübersicht ${jahr}</h3>
@@ -119,6 +154,23 @@ async function loadDashboard() {
           datasets: [{ label: 'Nebenkosten €', data: wohnungen.map((w) => verteilung.wohnungSummen?.[w.id] || 0), backgroundColor: '#2563eb' }],
         },
         options: { plugins: { legend: { display: false } }, responsive: true },
+      });
+    }
+
+    if (trend && trend.punkte && trend.punkte.length && document.getElementById('chart-trend')) {
+      const labels = trend.punkte.map((p) => p.x);
+      const nextLabel = jahr + 1;
+      const regressionData = [...trend.punkte.map((p) => trend.steigung_pro_jahr * p.x + trend.achsenabschnitt), trend.prognose_naechstes_jahr];
+      new Chart(document.getElementById('chart-trend'), {
+        type: 'line',
+        data: {
+          labels: [...labels, nextLabel],
+          datasets: [
+            { label: 'Tatsächliche Kosten', data: [...trend.punkte.map((p) => p.y), null], borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.2 },
+            { label: 'Regression / Prognose', data: regressionData, borderColor: '#dc2626', borderDash: [6, 4], pointRadius: 3, tension: 0 },
+          ],
+        },
+        options: { plugins: { legend: { position: 'bottom' } }, responsive: true },
       });
     }
   } catch (err) {

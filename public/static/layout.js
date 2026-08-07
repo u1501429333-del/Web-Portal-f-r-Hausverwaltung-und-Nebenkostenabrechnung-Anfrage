@@ -10,6 +10,8 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
     { key: 'kosten', href: '#/admin/kosten', icon: 'fa-file-invoice-dollar', label: 'Kosten erfassen' },
     { key: 'abrechnung', href: '#/admin/abrechnung', icon: 'fa-calculator', label: 'Abrechnung' },
     { key: 'dokumente', href: '#/admin/dokumente', icon: 'fa-file-contract', label: 'Dokumente' },
+    { key: 'schaeden', href: '#/admin/schaeden', icon: 'fa-screwdriver-wrench', label: 'Schadensmeldungen' },
+    { key: 'unterlagen', href: '#/admin/unterlagen', icon: 'fa-folder-open', label: 'Unterlagen' },
     { key: 'einstellungen', href: '#/admin/einstellungen', icon: 'fa-gear', label: 'Stammdaten / Branding' },
   ];
   const navItemsMieter = [
@@ -17,6 +19,8 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
     { key: 'zaehler', href: '#/mieter/zaehler', icon: 'fa-gauge', label: 'Zählerstand melden' },
     { key: 'historie', href: '#/mieter/historie', icon: 'fa-chart-line', label: 'Verlauf & Vergleich' },
     { key: 'abrechnung', href: '#/mieter/abrechnung', icon: 'fa-file-invoice', label: 'Nebenkostenabrechnung' },
+    { key: 'schaeden', href: '#/mieter/schaeden', icon: 'fa-screwdriver-wrench', label: 'Schadensmeldung' },
+    { key: 'unterlagen', href: '#/mieter/unterlagen', icon: 'fa-folder-open', label: 'Unterlagen' },
   ];
   const navItems = isAdmin ? navItemsAdmin : navItemsMieter;
 

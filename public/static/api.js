@@ -89,6 +89,36 @@ const API = {
 
   // Demo-Daten (flexibel, admin-gesteuert)
   generateDemo: (data) => api.post('/demo/generate', data).then((r) => r.data),
+
+  // Einstellungen erweitert (Heizungsanteil, §9a, PIN-Schutz, Erinnerungen, Vermieter-Kontakt)
+  getEinstellungenErweitert: () => api.get('/einstellungen/erweitert').then((r) => r.data),
+  updateEinstellungenErweitert: (data) => api.put('/einstellungen/erweitert', data).then((r) => r.data),
+  verifyPin: (pin) => api.post('/einstellungen/pin-verify', { pin }).then((r) => r.data),
+
+  // Dashboard erweitert (Leerstand, Mietende-Warnungen, Nachzahlungen, 3-Jahres-Kostentrend)
+  getDashboardErweitert: (objektId, jahr) => api.get(`/dashboard/objekt/${objektId}${jahr ? '?jahr=' + jahr : ''}`).then((r) => r.data),
+
+  // Zähler: Ablesungs-Ampel + CSV-Export
+  zaehlerCsvUrl: (objektId, jahr) => `/api/zaehler/objekt/${objektId}/jahr/${jahr}/csv`,
+
+  // Budget (Soll-Ist-Vergleich)
+  getBudget: (objektId, jahr) => api.get(`/budget/objekt/${objektId}/jahr/${jahr}`).then((r) => r.data),
+  setBudget: (objektId, jahr, kostenartId, betragSoll) =>
+    api.post(`/budget/objekt/${objektId}/jahr/${jahr}`, { kostenart_id: kostenartId, betrag_soll: betragSoll }).then((r) => r.data),
+
+  // Schadensmeldungen
+  listSchaedenByObjekt: (objektId, status) => api.get(`/schaeden/objekt/${objektId}${status ? '?status=' + status : ''}`).then((r) => r.data),
+  listSchaedenByWohnung: (wohnungId) => api.get(`/schaeden/wohnung/${wohnungId}`).then((r) => r.data),
+  createSchaden: (data) => api.post('/schaeden', data).then((r) => r.data),
+  updateSchaden: (id, data) => api.put(`/schaeden/${id}`, data).then((r) => r.data),
+  deleteSchaden: (id) => api.delete(`/schaeden/${id}`).then((r) => r.data),
+
+  // Unterlagen (Dateiupload: Steuerberater-Dokumente, Mieter-Uploads etc.)
+  listUnterlagenByObjekt: (objektId, ordner) => api.get(`/unterlagen/objekt/${objektId}${ordner ? '?ordner=' + ordner : ''}`).then((r) => r.data),
+  listUnterlagenByWohnung: (wohnungId) => api.get(`/unterlagen/wohnung/${wohnungId}`).then((r) => r.data),
+  getUnterlageData: (id) => api.get(`/unterlagen/${id}/data`).then((r) => r.data),
+  uploadUnterlage: (data) => api.post('/unterlagen', data).then((r) => r.data),
+  deleteUnterlage: (id) => api.delete(`/unterlagen/${id}`).then((r) => r.data),
 };
 
 // ---- kleine Utility-Funktionen ----

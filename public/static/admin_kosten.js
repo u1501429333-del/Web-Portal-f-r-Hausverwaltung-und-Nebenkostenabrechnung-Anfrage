@@ -24,9 +24,10 @@ async function loadKosten() {
   const objektId = AppState.currentObjektId;
   const jahr = AppState.currentJahr;
 
-  const [kosten, gas] = await Promise.all([
+  const [kosten, gas, budget] = await Promise.all([
     API.listKosten(objektId, jahr),
     API.getGas(objektId, jahr),
+    API.getBudget(objektId, jahr).catch(() => null),
   ]);
 
   const gesamt = kosten.reduce((s, k) => s + (k.betrag || 0), 0);
@@ -73,6 +74,34 @@ async function loadKosten() {
         </table>
       </div>
     </div>
+
+    ${budget ? `
+    <div class="card p-5 mt-5">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-slate-700"><i class="fas fa-scale-balanced text-indigo-600 mr-1"></i> Budgetplanung — Soll-Ist-Vergleich ${jahr}</h3>
+        <div class="text-sm text-slate-500">Soll gesamt: <b>${fmtEuro(budget.summe_soll)}</b> · Ist gesamt: <b>${fmtEuro(budget.summe_ist)}</b> · Differenz: <b class="${budget.differenz > 0 ? 'text-red-600' : 'text-emerald-600'}">${fmtEuro(budget.differenz)}</b></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="data-table w-full text-sm">
+          <thead><tr><th>Nr</th><th>Kostenart</th><th class="text-right">Soll €</th><th class="text-right">Ist €</th><th class="text-right">Differenz</th><th></th></tr></thead>
+          <tbody>
+            ${budget.positionen.map((p) => `
+              <tr>
+                <td>${p.nr}</td>
+                <td>${escapeHtml(p.bezeichnung)}</td>
+                <td class="text-right">
+                  <input type="number" step="0.01" class="form-input !py-1 !w-28 text-right inline-budget-soll" data-kostenart-id="${p.kostenart_id}" value="${p.betrag_soll ?? 0}">
+                </td>
+                <td class="text-right">${fmtEuro(p.betrag_ist)}</td>
+                <td class="text-right ${p.differenz > 0 ? 'text-red-600' : p.differenz < 0 ? 'text-emerald-600' : 'text-slate-400'}">${fmtEuro(p.differenz)}${p.differenz_pct != null ? ` (${p.differenz_pct >= 0 ? '+' : ''}${p.differenz_pct.toFixed(0)}%)` : ''}</td>
+                <td><button class="text-blue-600 hover:underline text-xs save-budget" data-kostenart-id="${p.kostenart_id}">Speichern</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : ''}
   `;
 
   document.getElementById('btn-save-gas').addEventListener('click', async () => {
@@ -97,6 +126,21 @@ async function loadKosten() {
   });
 
   document.getElementById('btn-new-kostenart').addEventListener('click', () => openKostenartModal(objektId));
+
+  container.querySelectorAll('.save-budget').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const kid = btn.dataset.kostenartId;
+      const input = container.querySelector(`.inline-budget-soll[data-kostenart-id="${kid}"]`);
+      const betragSoll = Number(input.value);
+      try {
+        await API.setBudget(objektId, jahr, kid, betragSoll);
+        toast('Budget gespeichert', 'success');
+        loadKosten();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+  });
 }
 
 function openKostenartModal(objektId) {
