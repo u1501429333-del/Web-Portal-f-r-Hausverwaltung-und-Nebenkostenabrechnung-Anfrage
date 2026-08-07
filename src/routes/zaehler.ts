@@ -72,6 +72,19 @@ zaehlerRoutes.get('/objekt/:objektId/jahr/:jahr', async (c) => {
     const vorvorjahr = await c.env.DB.prepare('SELECT stand FROM zaehlerstaende WHERE zaehler_id=? AND jahr=?')
       .bind(z.id, jahr - 2)
       .first<any>()
+
+    // Ablesungs-Ampel: grün = Ablesedatum vorhanden und aktuelles Kalenderjahr abgelesen,
+    // gelb = Wert vorhanden aber (z.B. Vorjahres-)Datum älter, rot = für dieses Jahr noch kein Wert erfasst.
+    let ampel: 'gruen' | 'gelb' | 'rot' = 'rot'
+    if (aktuell?.stand != null) {
+      if (aktuell.ablesedatum) {
+        const tageSeitAblesung = (Date.now() - new Date(aktuell.ablesedatum + 'T00:00:00').getTime()) / 86400000
+        ampel = tageSeitAblesung <= 400 ? 'gruen' : 'gelb'
+      } else {
+        ampel = 'gelb'
+      }
+    }
+
     result.push({
       ...z,
       stand_aktuell: aktuell?.stand ?? null,
@@ -79,9 +92,58 @@ zaehlerRoutes.get('/objekt/:objektId/jahr/:jahr', async (c) => {
       stand_vorjahr: vorjahr?.stand ?? null,
       verbrauch_aktuell: aktuell && vorjahr ? Math.max(0, aktuell.stand - vorjahr.stand) : null,
       verbrauch_vorjahr: vorjahr && vorvorjahr ? Math.max(0, vorjahr.stand - vorvorjahr.stand) : null,
+      ablesung_ampel: ampel,
     })
   }
   return c.json(result)
+})
+
+// CSV-Export der Zählerstände eines Jahres - für Steuerberater/Buchhaltung
+zaehlerRoutes.get('/objekt/:objektId/jahr/:jahr/csv', requireAdmin, async (c) => {
+  const objektId = c.req.param('objektId')
+  const jahr = Number(c.req.param('jahr'))
+  const zaehlerRows = await c.env.DB.prepare(
+    `SELECT z.*, w.bezeichnung as wohnung_bezeichnung
+     FROM zaehler z LEFT JOIN wohnungen w ON w.id = z.wohnung_id
+     WHERE z.objekt_id = ? ORDER BY z.sort_order, z.id`
+  )
+    .bind(objektId)
+    .all<any>()
+
+  const typLabels: Record<string, string> = {
+    wmz_heizung: 'WMZ Heizung',
+    wmz_boiler: 'WMZ Boiler',
+    warmwasser: 'Warmwasser',
+    kaltwasser: 'Kaltwasser',
+    sonstige: 'Sonstige',
+  }
+
+  const zeilen = ['Wohnung;Zaehlertyp;Bezeichnung;Seriennummer;Einheit;Stand_Vorjahr;Stand_' + jahr + ';Verbrauch;Ablesedatum']
+  for (const z of zaehlerRows.results as any[]) {
+    const aktuell = await c.env.DB.prepare('SELECT stand, ablesedatum FROM zaehlerstaende WHERE zaehler_id=? AND jahr=?').bind(z.id, jahr).first<any>()
+    const vorjahr = await c.env.DB.prepare('SELECT stand FROM zaehlerstaende WHERE zaehler_id=? AND jahr=?').bind(z.id, jahr - 1).first<any>()
+    const verbrauch = aktuell && vorjahr ? Math.max(0, aktuell.stand - vorjahr.stand) : ''
+    const wohnungLabel = z.wohnung_bezeichnung || 'Gebäude'
+    zeilen.push(
+      [
+        wohnungLabel,
+        typLabels[z.typ] || z.typ,
+        z.bezeichnung,
+        z.seriennummer || '',
+        z.einheit,
+        vorjahr?.stand ?? '',
+        aktuell?.stand ?? '',
+        verbrauch,
+        aktuell?.ablesedatum ?? '',
+      ]
+        .map((v) => String(v).replace(/;/g, ','))
+        .join(';')
+    )
+  }
+  const csv = '\uFEFF' + zeilen.join('\r\n') // BOM für korrekte Umlaute in Excel
+  c.header('Content-Type', 'text/csv; charset=utf-8')
+  c.header('Content-Disposition', `attachment; filename="Zaehlerstaende_${jahr}.csv"`)
+  return c.body(csv)
 })
 
 // Zählerstand eintragen/aktualisieren (Admin ODER Mieter für eigene Wohnung)

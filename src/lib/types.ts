@@ -79,6 +79,49 @@ export interface Branding {
   logo_data_url: string
 }
 
+export interface Einstellungen extends Branding {
+  heizkosten_verbrauch_anteil: number // HeizkostenV §7: 0.5 - 0.7 (Anteil verbrauchsabhängig, Rest = Grundkosten nach Fläche)
+  zuschlag_9a_pct: number // §9a HeizkostenV Nichtabrechnungs-Zuschlag in % (0 = deaktiviert)
+  pin_schutz_aktiv: boolean
+  pin_code: string
+  erinnerung_ablesung_tage_vorher: number
+  erinnerung_abrechnung_frist_monate: number
+  vermieter_email_steuerberater: string
+}
+
+export type SchadenPrioritaet = 'hoch' | 'mittel' | 'niedrig'
+export type SchadenStatus = 'offen' | 'in_bearbeitung' | 'erledigt'
+
+export interface Schadensmeldung {
+  id: number
+  objekt_id: number
+  wohnung_id: number
+  mieter_id: number | null
+  titel: string
+  beschreibung: string
+  raum: string
+  prioritaet: SchadenPrioritaet
+  status: SchadenStatus
+  admin_notiz: string
+  erstellt_am: string
+  aktualisiert_am: string
+}
+
+export interface Unterlage {
+  id: number
+  objekt_id: number | null
+  wohnung_id: number | null
+  mieter_id: number | null
+  ordner: string
+  dateiname: string
+  content_type: string
+  data_url: string
+  groesse_bytes: number
+  hochgeladen_von: string
+  beschreibung: string
+  erstellt_am: string
+}
+
 export type ZaehlerTyp = 'wmz_heizung' | 'wmz_boiler' | 'warmwasser' | 'kaltwasser' | 'sonstige'
 
 export interface Zaehler {

@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { Bindings, Wohnung, Mieter, Kostenart, Verteilerschluessel } from './types'
+import { getEinstellungen } from './settings'
 
 export interface WohnungVerbrauch {
   wohnung_id: number
@@ -161,12 +162,17 @@ export interface KostenartVerteilung {
   differenz: number
 }
 
-/** Ermittelt den Verteilungs-Anteil (0..1) einer Wohnung für einen gegebenen Schlüssel */
+/** Ermittelt den Verteilungs-Anteil (0..1) einer Wohnung für einen gegebenen Schlüssel.
+ *  verbrauchsAnteil: konfigurierbarer Anteil (0.5-0.7) nach HeizkostenV §7 für die
+ *  verbrauchsabhängige Komponente bei Heizung/Warmwasser (Standard 0.7 = 70/30). */
 function anteilFuerSchluessel(
   schluessel: Verteilerschluessel,
   w: WohnungVerbrauch,
-  summen: GebaeudeSummen
+  summen: GebaeudeSummen,
+  verbrauchsAnteil: number = 0.7
 ): number {
+  const va = Math.min(0.7, Math.max(0.5, verbrauchsAnteil || 0.7))
+  const grundAnteil = 1 - va
   switch (schluessel) {
     case 'flaeche':
       return summen.flaeche_gesamt > 0 ? w.flaeche_m2 / summen.flaeche_gesamt : 0
@@ -180,12 +186,12 @@ function anteilFuerSchluessel(
     case 'heizung_30_70': {
       const flAnteil = summen.flaeche_gesamt > 0 ? w.flaeche_m2 / summen.flaeche_gesamt : 0
       const vbAnteil = summen.wmz_heizung_gesamt > 0 ? w.wmz_heizung_verbrauch / summen.wmz_heizung_gesamt : 0
-      return 0.3 * flAnteil + 0.7 * vbAnteil
+      return grundAnteil * flAnteil + va * vbAnteil
     }
     case 'warmwasser_30_70': {
       const flAnteil = summen.flaeche_gesamt > 0 ? w.flaeche_m2 / summen.flaeche_gesamt : 0
       const vbAnteil = summen.ww_gesamt > 0 ? w.ww_verbrauch / summen.ww_gesamt : 0
-      return 0.3 * flAnteil + 0.7 * vbAnteil
+      return grundAnteil * flAnteil + va * vbAnteil
     }
     default:
       return 0
@@ -204,8 +210,12 @@ export async function berechneVerteilung(
   gesamtkosten: number
   wohnungSummen: Record<number, number>
   gasInfo: { gesamtbetrag: number; anteilHeizung: number; anteilWarmwasser: number; kostenHeizung: number; kostenWarmwasser: number } | null
+  heizkostenConfig: { verbrauchsAnteil: number; grundAnteil: number; zuschlag9aPct: number }
 }> {
   const { wohnungen, summen, boiler_verbrauch } = await getVerbrauchsdaten(db, objektId, jahr)
+  const einstellungen = await getEinstellungen(db)
+  const verbrauchsAnteil = einstellungen.heizkosten_verbrauch_anteil || 0.7
+  const zuschlag9aFaktor = 1 + (einstellungen.zuschlag_9a_pct || 0) / 100
 
   const kostenartenRows = await db
     .prepare('SELECT * FROM kostenarten WHERE objekt_id = ? AND aktiv = 1 ORDER BY sort_order, nr')
@@ -244,6 +254,10 @@ export async function berechneVerteilung(
       if (ka.verteilerschluessel === 'heizung_30_70') gesamtbetrag = gasInfo.kostenHeizung
       if (ka.verteilerschluessel === 'warmwasser_30_70') gesamtbetrag = gasInfo.kostenWarmwasser
     }
+    // §9a HeizkostenV: optionaler Zuschlag (z.B. bei fehlender Verbrauchserfassung), konfigurierbar in den Einstellungen
+    if ((ka.verteilerschluessel === 'heizung_30_70' || ka.verteilerschluessel === 'warmwasser_30_70') && zuschlag9aFaktor !== 1) {
+      gesamtbetrag *= zuschlag9aFaktor
+    }
 
     // Bei "individuell" kann der Admin für diese Kostenart pro Wohnung einen frei definierten
     // Prozentanteil hinterlegt haben (Tabelle individuelle_anteile). Ist nichts hinterlegt,
@@ -267,7 +281,7 @@ export async function berechneVerteilung(
     const anteile: Record<number, { anteil_pct: number; betrag: number }> = {}
     let summeVerteilt = 0
     for (const w of wohnungen) {
-      const pct = customMap ? customMap[w.wohnung_id] ?? 0 : anteilFuerSchluessel(ka.verteilerschluessel, w, summen)
+      const pct = customMap ? customMap[w.wohnung_id] ?? 0 : anteilFuerSchluessel(ka.verteilerschluessel, w, summen, verbrauchsAnteil)
       const betrag = gesamtbetrag * pct
       anteile[w.wohnung_id] = { anteil_pct: pct, betrag }
       summeVerteilt += betrag
@@ -288,7 +302,16 @@ export async function berechneVerteilung(
     gesamtkosten += gesamtbetrag
   }
 
-  return { wohnungen, summen, boiler_verbrauch, kostenarten, gesamtkosten, wohnungSummen, gasInfo }
+  return {
+    wohnungen,
+    summen,
+    boiler_verbrauch,
+    kostenarten,
+    gesamtkosten,
+    wohnungSummen,
+    gasInfo,
+    heizkostenConfig: { verbrauchsAnteil, grundAnteil: 1 - verbrauchsAnteil, zuschlag9aPct: einstellungen.zuschlag_9a_pct },
+  }
 }
 
 /** Tagesgenaue Abrechnung: Tage = Mietende - Mietbeginn + 1 (begrenzt auf Jahreslänge), Tagesfaktor = Tage / Jahreslänge */
