@@ -10,14 +10,36 @@
 
 ## Hauptfunktionen
 - **Admin- und Mieter-Login** mit Rollen-/Rechtetrennung, PBKDF2-Passwort-Hashing,
-  HMAC-signierte Session-Cookies (httpOnly).
+  HMAC-signierte Session-Cookies (httpOnly). Optionaler **PIN-Schutz** für sensible
+  Admin-Bereiche (Einstellungen, verifizierbar per `/api/einstellungen/pin-verify`).
 - **WMZ-Zählerstände** (Wärmemengenzähler Heizung, Warmwasser, Kaltwasser) mit
-  Jahresvergleich (Vorjahr/aktuelles Jahr).
-- **Nebenkostenabrechnung nach BetrKV §2** (alle 17 gesetzlichen Kostenarten) und
-  **HeizkostenV §7/§8** (30 %/70 %-Split Grundkosten/Verbrauchskosten bei Heizung/Warmwasser).
+  Jahresvergleich (Vorjahr/aktuelles Jahr), **Ablesungs-Ampel** (grün/gelb/rot je nach
+  Aktualität der letzten Ablesung) und **CSV-Export für den Steuerberater**
+  (UTF-8-BOM, semikolon-getrennt für Excel) inkl. direktem **„An Steuerberater
+  senden"-Mailto-Link**.
+- **Nebenkostenabrechnung nach BetrKV §2** (alle 17 gesetzlichen Kostenarten,
+  **automatisch beim Anlegen eines neuen Objekts erzeugt**) und **HeizkostenV
+  §7/§8** mit **konfigurierbarem Verbrauchsanteil (50–70 %, Admin-einstellbar)**
+  statt fest 30/70, sowie optionalem **§9a-Nichtabrechnungszuschlag (0–15 %)**.
+- **Auto-Zähler bei neuer Wohnung**: Beim Anlegen einer Wohnung werden automatisch
+  3 Standardzähler (WMZ Heizung/kWh, Warmwasser/m³, Kaltwasser/m³) angelegt.
 - **Individuelle Verteilerschlüssel**: Für Kostenarten mit Schlüssel "individuell"
   können pro Wohnung beliebige Prozent-Anteile hinterlegt werden (automatisch auf
   100 % normalisiert; ohne Eintrag gleichmäßige Verteilung als Fallback).
+- **Admin-Dashboard** mit Leerstandsquote, offenen Nachzahlungen/Guthaben,
+  Mietende-Warnungen (90-Tage-Vorschau) und **3-Jahres-Kostentrend mit linearer
+  Regressionsanalyse** (Chart.js-Diagramm inkl. Prognose fürs Folgejahr).
+- **Budgetplanung (Soll-Ist-Vergleich)** je Kostenart und Jahr, mit farbiger
+  Differenzanzeige.
+- **Schadensmeldungen**: Mieter können Schäden mit Priorität, Raumauswahl und
+  Beschreibung melden; Admin verwaltet Status-Workflow (offen → in Bearbeitung →
+  erledigt) inkl. Rückmeldungs-Notiz an den Mieter.
+- **Unterlagen-Verwaltung**: Datei-Upload (Base64-Data-URL, bis ~5 MB) in Ordnern
+  „Allgemein", „Steuerberater" (nur Admin) und „Zählerfotos"; Mieter können eigene
+  Dateien (z. B. Zählerfotos, Ablesedatenblätter) hochladen und wieder löschen.
+- **WMZ-Ablesehilfe** (Bedienungsanleitung Sensus PolluCom F/E, Schritte L1–L6) als
+  aufklappbare Karte im Mieterportal sowie als druckfertiges HTML-Dokument, inkl.
+  Bildbeispiel und **leerem Ablesedatenblatt zum Ausdrucken**.
 - **Auto-generierte Dokumente** (HTML, druckbar/als PDF exportierbar über
   `@media print`), inkl. Firmen-Logo im Briefkopf:
   - Mietvertrag (inkl. Stellplatz/Garage/Keller/Garten/Schlüssel-Angaben)
@@ -26,10 +48,11 @@
   - Treppenreinigungsplan (**echte wöchentliche ISO-Kalenderwochen-Rotation**, nicht
     monatlich)
   - Nebenkostenabrechnung pro Mieter
+  - WMZ-Ablesehilfe (Sensus PolluCom F/E) und Ablesedatenblatt
   - Dokumente werden automatisch (neu) erzeugt, wenn eine neue Wohnung oder ein
     neuer Mieter angelegt wird.
 - **Branding**: Editierbarer App-Name + Logo-Upload (Data-URL, in der Datenbank
-  gespeichert), erscheint in Sidebar, Login-Seite und allen 5 Dokumenttypen.
+  gespeichert), erscheint in Sidebar, Login-Seite und allen Dokumenttypen.
 - **Flexibler Demo-Datengenerator** (Admin-einstellbar: Anzahl Wohnungen, Jahre,
   Namensschema, E-Mail-Domain, optionales automatisches Anlegen von Mieter-Logins)
   – ersetzt fest verdrahtete Testdaten.
@@ -40,17 +63,32 @@
 - **Lokale Entwicklung (Sandbox)**: `http://localhost:3000` (via PM2 + `wrangler pages dev`)
 - **Selbst-Hosting (Docker, z. B. TV-Box)**: `http://<Server-IP>:3000` – siehe
   [`INSTALL.md`](./INSTALL.md) für die vollständige Schritt-für-Schritt-Anleitung.
-- **GitHub**: https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP
+- **GitHub**: https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage
 
 ## Daten-Architektur
 - **Datenmodell** (SQLite/D1): `objekte`, `wohnungen`, `mieter`, `zaehler`,
   `zaehlerstaende`, `kostenarten`, `kosten`, `individuelle_anteile`, `dokumente`,
-  `users`, `einstellungen` (Key-Value, u. a. Branding).
+  `users`, `einstellungen` (Key-Value, u. a. Branding/Heizkosten-Split/PIN),
+  `schadensmeldungen`, `unterlagen` (Base64-Data-URL-Dateien), `budget`
+  (Soll-Werte je Kostenart/Jahr).
 - **Storage**: Cloudflare D1 (SQLite) – im Self-Hosting-Betrieb lokal emuliert über
   `wrangler pages dev --local` (Miniflare), persistiert in einem Docker-Volume.
 - **Datenfluss**: Zählerstände + Kosten pro Objekt/Jahr → `berechneVerteilung()`
   (BetrKV/HeizkostenV-konforme Verteilung inkl. individueller Anteile) →
   Nebenkostenabrechnung pro Mieter (HTML/PDF).
+
+## API-Endpunkte (Auswahl, alle unter `/api/*`, Session-Cookie erforderlich)
+| Bereich | Methode & Pfad | Zugriff |
+|---|---|---|
+| Auth | `POST /auth/login`, `GET /auth/me`, `POST /auth/logout` | öffentlich/beide |
+| Dashboard | `GET /dashboard/objekt/:objektId?jahr=` (Leerstand, Nachzahlungen, Mietende, Kostentrend+Regression) | Admin |
+| Einstellungen | `GET/PUT /einstellungen/erweitert`, `POST /einstellungen/pin-verify` | Admin |
+| Zähler | `GET /zaehler/objekt/:objektId/jahr/:jahr/csv` (CSV-Export, Ablesungs-Ampel) | Admin |
+| Budget | `GET /budget/objekt/:objektId/jahr/:jahr`, `POST /budget/objekt/:objektId/jahr/:jahr` (Soll-Ist) | Admin |
+| Schadensmeldungen | `GET/POST/PUT/DELETE /schaeden/*` (Objekt/Wohnung-Listen, Status-Workflow) | Admin+Mieter (eigene) |
+| Unterlagen | `GET/POST/DELETE /unterlagen/*` (Ordner: allgemein/steuerberater/zaehlerfotos) | Admin+Mieter (eigene) |
+| Dokumente | `GET /dokumente/wmz-ablesehilfe/html`, `GET /dokumente/ablesedatenblatt/:wohnungId/:jahr` | Admin+Mieter (eigene Wohnung) |
+| Objekte/Wohnungen | `POST /objekte` (erzeugt automatisch 17 BetrKV-Kostenarten), `POST /objekte/:id/wohnungen` (erzeugt automatisch 3 Standardzähler) | Admin |
 
 ## Benutzerhandbuch (Kurzfassung)
 1. **Admin-Login** mit den Zugangsdaten aus der Demo-Migration (siehe unten) oder
@@ -65,7 +103,12 @@
 7. **Admin → Dokumente**: Mietvertrag/Hausordnung/Wohnungsübergabe/Reinigungsplan
    einsehen bzw. neu generieren.
 8. **Admin → Stammdaten / Branding**: App-Name/Logo ändern, Demo-Daten generieren.
-9. **Mieter-Login**: Mieter sehen ihre eigene Abrechnung, Zählerstände und Dokumente.
+9. **Mieter-Login**: Mieter sehen ihre eigene Abrechnung, Zählerstände (inkl.
+   WMZ-Ablesehilfe), Dokumente, können Schäden melden und eigene Unterlagen hochladen.
+10. **Admin → Einstellungen**: Heizkostenanteil (§7/§8) und §9a-Zuschlag anpassen,
+    PIN-Schutz aktivieren, Erinnerungsfristen und Steuerberater-E-Mail hinterlegen.
+11. **Admin → Schadensmeldungen**: Status setzen, Rückmeldung an Mieter notieren.
+12. **Admin → Unterlagen**: Steuerberater-Dokumente hochladen, Mieter-Uploads einsehen.
 
 **Demo-Zugangsdaten (Basis-Migration):**
 | Rolle  | E-Mail                     | Passwort   |
@@ -75,13 +118,20 @@
 
 ## Noch nicht implementiert
 - UI-Dialog zum Ändern des eigenen Passworts (aktuell nur per DB/Admin-Reset möglich).
-- Echter Versand von Dokumenten per E-Mail (aktuell nur HTML-Ansicht/Druck).
+- Echter (serverseitiger) E-Mail-Versand von Dokumenten/CSV-Exporten (aktuell nur
+  `mailto:`-Link bzw. HTML-Ansicht/Druck – kein SMTP/API-Versand).
+- PIN-Schutz ist aktuell nur eine Einstellung + Verifikations-Endpoint; es fehlt noch
+  ein Frontend-Gate/Modal, das den Admin-Bereich beim Öffnen tatsächlich sperrt.
+- Taggenauer PDF-Export mit Briefkopf für die **Jahresübersicht aller Wohnungen**
+  (Summenfußzeile) ist noch nicht umgesetzt – aktuell nur Einzelabrechnung pro Mieter.
 - Mehrsprachigkeit (aktuell nur Deutsch).
 - Automatisierte Tests (aktuell manuell per curl/Playwright verifiziert).
 
 ## Empfohlene nächste Schritte
+- PIN-Schutz-Frontend-Gate (Modal-Abfrage vor Zugriff auf Admin-Bereich) ergänzen.
 - Passwort-Ändern-Dialog für Admin/Mieter ergänzen.
-- E-Mail-Versand (z. B. via Resend/SendGrid REST-API) für generierte Dokumente.
+- Echter E-Mail-Versand (z. B. via Resend/SendGrid REST-API) statt `mailto:`-Link.
+- Jahresübersicht-PDF (alle Wohnungen, Summenfußzeile) als weiteres Dokument ergänzen.
 - Echtes Cloudflare-Deployment (Pages + echte D1-Datenbank) als Alternative zum
   Self-Hosting anbieten.
 
@@ -95,7 +145,7 @@
 - **Status**: ✅ Aktiv (lokale Sandbox-Instanz läuft), Docker-Self-Hosting-Setup
   bereitgestellt (`Dockerfile`, `docker-compose.yml`, `scripts/install.sh`,
   `scripts/update.sh`, `scripts/backup.sh`) – siehe [`INSTALL.md`](./INSTALL.md).
-- **Letzte Aktualisierung**: 2026-08-05
+- **Letzte Aktualisierung**: 2026-08-08
 
 ## Entwicklung (lokal / Sandbox)
 ```bash
@@ -108,7 +158,7 @@ curl http://localhost:3000
 ## Selbst-Hosting (Docker)
 Siehe die ausführliche Anleitung in [`INSTALL.md`](./INSTALL.md) – kurz zusammengefasst:
 ```bash
-git clone https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP.git
-cd Hausverwaltung-Software-APP
+git clone https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git
+cd Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage
 bash scripts/install.sh
 ```
