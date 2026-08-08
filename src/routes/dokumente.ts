@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppContext } from '../lib/types'
 import { requireAdmin } from './auth'
-import { generateMietvertrag, generateHausordnung, generateReinigungsplan, generateWohnungsuebergabe } from '../lib/dokumente'
+import { generateMietvertrag, generateHausordnung, generateReinigungsplan, generateWohnungsuebergabe, generateWmzAnleitung, generateAblesedatenblatt } from '../lib/dokumente'
 import { generateAbrechnungHtml } from '../lib/abrechnungPdf'
 import { berechneMieterabrechnung } from '../lib/calc'
 import { getBranding } from '../lib/settings'
@@ -83,6 +83,56 @@ dokumenteRoutes.get('/objekt/:objektId', requireAdmin, async (c) => {
     .bind(objektId)
     .all()
   return c.json(rows.results)
+})
+
+// WMZ-Ablesehilfe (Bedienungsanleitung Sensus PolluCom F/E) - druckfertiges HTML, für Admin und Mieter zugänglich
+// WICHTIG: Muss VOR der generischen '/:id/html' Route stehen, da diese sonst 'wmz-ablesehilfe' als :id interpretiert.
+dokumenteRoutes.get('/wmz-ablesehilfe/html', async (c) => {
+  const session = c.get('session')
+  if (!session) return c.text('Nicht angemeldet', 401)
+
+  let objekt: any = null
+  const objektIdParam = c.req.query('objektId')
+  if (objektIdParam) {
+    objekt = await c.env.DB.prepare('SELECT * FROM objekte WHERE id = ?').bind(Number(objektIdParam)).first<any>()
+  } else if (session.role === 'mieter') {
+    const mieterRow = await c.env.DB.prepare(
+      `SELECT o.* FROM objekte o JOIN wohnungen w ON w.objekt_id = o.id JOIN mieter m ON m.wohnung_id = w.id WHERE m.id = ?`
+    ).bind(session.mieterId).first<any>()
+    objekt = mieterRow
+  }
+  if (!objekt) {
+    objekt = await c.env.DB.prepare('SELECT * FROM objekte ORDER BY id LIMIT 1').first<any>()
+  }
+  if (!objekt) return c.text('Kein Objekt gefunden', 404)
+
+  const branding = await getBranding(c.env.DB)
+  const html = generateWmzAnleitung(objekt, branding)
+  return c.html(html)
+})
+
+// Ablesedatenblatt (leeres Formular zum handschriftlichen Eintragen der Zählerstände)
+// WICHTIG: Ebenfalls VOR '/:id/html' registriert, um Routenkollision zu vermeiden.
+dokumenteRoutes.get('/ablesedatenblatt/:wohnungId/:jahr', async (c) => {
+  const session = c.get('session')
+  if (!session) return c.text('Nicht angemeldet', 401)
+
+  const wohnungId = Number(c.req.param('wohnungId'))
+  const jahr = Number(c.req.param('jahr'))
+
+  const wohnung = await c.env.DB.prepare('SELECT * FROM wohnungen WHERE id = ?').bind(wohnungId).first<any>()
+  if (!wohnung) return c.text('Wohnung nicht gefunden', 404)
+
+  if (session.role === 'mieter') {
+    const mieterRow = await c.env.DB.prepare('SELECT wohnung_id FROM mieter WHERE id = ?').bind(session.mieterId).first<any>()
+    if (!mieterRow || mieterRow.wohnung_id !== wohnungId) return c.text('Keine Berechtigung', 403)
+  }
+
+  const objekt = await c.env.DB.prepare('SELECT * FROM objekte WHERE id = ?').bind(wohnung.objekt_id).first<any>()
+  const zaehlerRows = await c.env.DB.prepare('SELECT bezeichnung, typ, einheit FROM zaehler WHERE wohnung_id = ? ORDER BY sort_order, id').bind(wohnungId).all<any>()
+  const branding = await getBranding(c.env.DB)
+  const html = generateAblesedatenblatt(objekt, wohnung, zaehlerRows.results as any[], jahr, branding)
+  return c.html(html)
 })
 
 dokumenteRoutes.get('/:id/html', async (c) => {
@@ -169,3 +219,4 @@ dokumenteRoutes.get('/abrechnung-html/:wohnungId/:jahr', async (c) => {
   const html = generateAbrechnungHtml(objekt, eigene, jahr, vorjahr, branding)
   return c.html(html)
 })
+

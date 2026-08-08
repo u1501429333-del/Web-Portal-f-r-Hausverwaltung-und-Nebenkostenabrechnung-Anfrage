@@ -14,6 +14,8 @@ async function loadZaehlerstaende() {
   const objektId = AppState.currentObjektId;
   const jahr = AppState.currentJahr;
   const daten = await API.listZaehlerMitStand(objektId, jahr);
+  const einstellungen = await API.getEinstellungenErweitert().catch(() => ({}));
+  const steuerberaterEmail = einstellungen.vermieter_email_steuerberater || '';
 
   const gruppen = {
     wmz_boiler: { label: 'Wärmemengenzähler Boiler (Gebäude)', items: [] },
@@ -33,9 +35,14 @@ async function loadZaehlerstaende() {
   container.innerHTML = `
     <div class="mb-4 flex items-center justify-between">
       <p class="text-slate-500 text-sm">Zählerjahr <b>${jahr}</b> — Verbrauch = Zählerstand ${jahr} − Zählerstand ${jahr - 1}. <span class="ml-2">${ampelDot('gruen')}aktuell ${ampelDot('gelb')}veraltet ${ampelDot('rot')}fehlt</span></p>
-      <a href="${API.zaehlerCsvUrl(objektId, jahr)}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-        <i class="fas fa-file-csv mr-1"></i> CSV-Export für Steuerberater
-      </a>
+      <div class="flex gap-2">
+        <a href="${API.zaehlerCsvUrl(objektId, jahr)}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+          <i class="fas fa-file-csv mr-1"></i> CSV-Export für Steuerberater
+        </a>
+        ${steuerberaterEmail ? `<a href="mailto:${encodeURIComponent(steuerberaterEmail)}?subject=${encodeURIComponent('Zählerstände ' + jahr)}&body=${encodeURIComponent('Sehr geehrte Damen und Herren,\n\nanbei die Zählerstände für das Jahr ' + jahr + '. Bitte laden Sie die CSV-Datei separat unter folgendem Link herunter:\n' + window.location.origin + API.zaehlerCsvUrl(objektId, jahr) + '\n\nMit freundlichen Grüßen')}" class="bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded-lg" title="E-Mail an ${escapeHtml(steuerberaterEmail)}">
+          <i class="fas fa-envelope mr-1"></i> An Steuerberater senden
+        </a>` : `<span class="text-xs text-amber-600 self-center"><i class="fas fa-triangle-exclamation mr-1"></i>Keine Steuerberater-E-Mail in Einstellungen hinterlegt</span>`}
+      </div>
     </div>
     ${Object.entries(gruppen).map(([typ, grp]) => grp.items.length ? `
       <div class="card p-5 mb-5">

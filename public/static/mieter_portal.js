@@ -115,7 +115,7 @@ async function loadMieterZaehler() {
         <i class="fas fa-chevron-down text-slate-400" id="wmz-hilfe-chevron"></i>
       </button>
       <div id="wmz-hilfe-body" class="hidden mt-4">
-        ${wmzAblesehilfeHtml()}
+        ${wmzAblesehilfeHtml(wohnung.id, jahr)}
       </div>
     </div>
 
@@ -170,7 +170,7 @@ async function loadMieterZaehler() {
 }
 
 // -------- WMZ-Ablesehilfe (Sensus PolluCom F/E) --------
-function wmzAblesehilfeHtml() {
+function wmzAblesehilfeHtml(wohnungId, jahr) {
   return `
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
       <div>
@@ -199,8 +199,9 @@ function wmzAblesehilfeHtml() {
         </div>
       </div>
     </div>
-    <div class="mt-4 flex gap-3">
+    <div class="mt-4 flex flex-wrap gap-4">
       <a href="/api/dokumente/wmz-ablesehilfe/html" target="_blank" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-pdf mr-1"></i> Anleitung als PDF öffnen/drucken</a>
+      ${wohnungId ? `<a href="/api/dokumente/ablesedatenblatt/${wohnungId}/${jahr}" target="_blank" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-lines mr-1"></i> Ablesedatenblatt (leer) drucken</a>` : ''}
     </div>
   `;
 }

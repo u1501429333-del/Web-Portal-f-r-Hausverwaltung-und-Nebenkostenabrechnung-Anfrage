@@ -388,3 +388,75 @@ export function generateWohnungsuebergabe(objekt: Objekt, wohnung: Wohnung, miet
     <p class="footer-note">Erstellt am ${new Date().toLocaleDateString('de-DE')} · Dient als Nachweis für spätere Kautions- bzw. Schadensabrechnung.</p>
   </body></html>`
 }
+
+// -------------------------------------------------------------
+// WMZ-Ablesehilfe (Bedienungsanleitung Sensus PolluCom F/E) als
+// druckfertiges Dokument für Mieter · L1-L6 Bedienschritte
+// -------------------------------------------------------------
+
+export function generateWmzAnleitung(objekt: Objekt, branding: Branding = emptyBranding): string {
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>WMZ-Ablesehilfe</title>${baseStyles}
+  <style>
+    .step { display:flex; gap:12px; margin: 10px 0; align-items:flex-start; }
+    .step .num { flex:0 0 30px; height:30px; border-radius:50%; background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+    .step .txt { flex:1; }
+    .tip-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:10px 14px; margin:14px 0; font-size:11.5px; }
+    .display-box { display:inline-block; background:#0f172a; color:#4ade80; font-family: monospace; padding:6px 14px; border-radius:4px; font-size:13px; }
+  </style>
+  </head>
+  <body>
+    ${docHeader('WMZ-Ablesehilfe', `Bedienungsanleitung Wärmemengenzähler (Sensus PolluCom F/E) · ${objekt.name}`, branding)}
+
+    <p>Diese Anleitung erklärt Schritt für Schritt, wie Sie Ihren Wärmemengenzähler (Heizung) bzw. Wasserzähler selbst ablesen können. Bitte lesen Sie <span class="paragraf">jährlich zum Stichtag</span> (siehe Erinnerung im Mieterportal) den aktuellen Zählerstand ab und melden Sie ihn über das Mieterportal.</p>
+
+    <h2>Anzeige-Tasten am Gerät</h2>
+    <div class="step"><div class="num">L1</div><div class="txt">Kurzer Tastendruck (Taste rechts unten am Display) &rarr; zeigt den <span class="paragraf">aktuellen Wärmeverbrauch</span> in <span class="display-box">MWh</span> bzw. <span class="display-box">kWh</span> an. <b>Dies ist der Wert, den Sie ablesen und übertragen müssen.</b></div></div>
+    <div class="step"><div class="num">L2</div><div class="txt">Taste erneut kurz drücken &rarr; weitere Zusatzwerte (z. B. Betriebsstunden) werden nacheinander angezeigt.</div></div>
+    <div class="step"><div class="num">L3</div><div class="txt">Taste 8 Sekunden gedrückt halten, danach 2× kurz (je ca. 2 Sekunden) drücken &rarr; Zusatzmenü mit Durchflussmenge (m³), Vor-/Rücklauftemperatur und aktueller Leistung. <span class="small">(Für die normale Ablesung nicht erforderlich.)</span></div></div>
+    <div class="step"><div class="num">L4</div><div class="txt">Im Zusatzmenü: Navigation zu monatlichen Rückblick-Werten möglich (Anzeige "Monat", Datum blinkt).</div></div>
+    <div class="step"><div class="num">L5</div><div class="txt">Mit "Zurück" (lange gedrückt halten) gelangen Sie wieder zur Startanzeige "Heute" / aktueller Stand.</div></div>
+    <div class="step"><div class="num">L6</div><div class="txt">Erscheint im Display ein <span class="display-box">F</span> (Störungshinweis / Fehlercode), liegt eine technische Störung vor. Bitte umgehend die Hausverwaltung informieren – <b>nicht selbst öffnen oder reparieren.</b></div></div>
+
+    <div class="tip-box"><i class="paragraf">Tipp:</i> Fotografieren Sie den Zähler inkl. Displayanzeige und laden Sie das Foto im Mieterportal unter „Unterlagen" hoch – das erleichtert die Prüfung durch die Hausverwaltung.</div>
+
+    <h2>Wasserzähler (Warmwasser / Kaltwasser)</h2>
+    <p>Die Wasserzähler zeigen den Verbrauch in <span class="display-box">m³</span> direkt über ein mechanisches Rollenzählwerk an – kein Tastendruck notwendig. Bitte lesen Sie alle schwarzen (ganze m³) und roten (Nachkommastellen) Ziffern von links nach rechts ab.</p>
+
+    <h2>Wo trage ich den Wert ein?</h2>
+    <p>Melden Sie den abgelesenen Wert im Mieterportal unter „Zählerstände" oder verwenden Sie das separate Ablesedatenblatt (siehe Dokumente-Bereich).</p>
+
+    <p class="footer-note">Bei Fragen zur Ablesung wenden Sie sich an die Hausverwaltung. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
+  </body></html>`
+}
+
+// -------------------------------------------------------------
+// Ablesedatenblatt: Formular zum handschriftlichen Notieren der
+// Zählerstände (z.B. wenn Online-Eingabe nicht möglich ist)
+// -------------------------------------------------------------
+
+export function generateAblesedatenblatt(objekt: Objekt, wohnung: Wohnung, zaehlerListe: { bezeichnung: string; typ: string; einheit: string }[], jahr: number, branding: Branding = emptyBranding): string {
+  const rows = zaehlerListe.length
+    ? zaehlerListe.map((z) => `<tr><td>${z.bezeichnung}</td><td>${z.typ}</td><td class="fill-box" style="text-align:center;">&nbsp;</td><td>${z.einheit}</td><td class="fill-box" style="min-width:110px;">&nbsp;</td></tr>`).join('')
+    : `<tr><td colspan="5" class="small">Keine Zähler für diese Wohnung erfasst.</td></tr>`
+
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Ablesedatenblatt</title>${baseStyles}</head>
+  <body>
+    ${docHeader('Ablesedatenblatt', `${wohnung.bezeichnung} · ${objekt.name} · Ablesejahr ${jahr}`, branding)}
+
+    <p>Bitte tragen Sie hier die aktuellen Zählerstände ein und geben Sie das Blatt bei der Hausverwaltung ab oder übertragen Sie die Werte anschließend online ins Mieterportal.</p>
+
+    <table>
+      <tr><th>Zähler</th><th>Typ</th><th>Zählerstand</th><th>Einheit</th><th>Ablesedatum</th></tr>
+      ${rows}
+    </table>
+
+    <h2>Bemerkungen</h2>
+    <table><tr><td class="fill-box" style="min-height:60px;">&nbsp;</td></tr></table>
+
+    <div class="sig-row">
+      <div class="sig-box">Ort, Datum, Unterschrift Mieter</div>
+      <div class="sig-box">&nbsp;</div>
+    </div>
+    <p class="footer-note">Erstellt am ${new Date().toLocaleDateString('de-DE')}</p>
+  </body></html>`
+}
