@@ -63,12 +63,104 @@ async function router() {
     // Branding ist rein kosmetisch – Fehler hier dürfen die App nicht blockieren
   }
 
+  // PIN-Schutz-Gate: läuft NACH dem Auth-Check, aber VOR jedem echten Routen-Handler.
+  // Betrifft nur den Admin-Bereich (Mieter haben keinen PIN-Schutz). Solange der PIN
+  // in dieser Browser-Session noch nicht bestätigt wurde, wird statt der Zielseite
+  // ein Eingabe-Bildschirm gerendert; erst nach erfolgreicher Prüfung wird der
+  // eigentliche Handler aufgerufen.
+  if (AppState.user?.role === 'admin') {
+    const granted = await checkPinGate(app);
+    if (!granted) return;
+  }
+
   try {
     await matched.handler(app, matched.params, matched.query);
   } catch (err) {
     console.error(err);
     app.innerHTML = `<div class="p-8"><div class="card p-6 border-l-4 border-red-500"><h2 class="font-bold text-red-700">Fehler beim Laden</h2><p class="text-slate-600 mt-1">${escapeHtml(err.message)}</p></div></div>`;
   }
+}
+
+// ============================================================
+// PIN-Schutz-Frontend-Gate
+// ============================================================
+// Prüft (einmal pro Browser-Session), ob PIN-Schutz aktiv ist, und blockiert
+// andernfalls den Zugriff auf den Admin-Bereich, bis der korrekte PIN über
+// POST /api/einstellungen/pin-verify bestätigt wurde.
+async function checkPinGate(app) {
+  if (!AppState.pinChecked) {
+    try {
+      const e = await API.getEinstellungenErweitert();
+      AppState.pinRequired = !!(e.pin_schutz_aktiv && e.pin_gesetzt);
+    } catch {
+      // Bei Fehlern (z.B. Netzwerkproblem) lieber nicht blockieren –
+      // die eigentlichen API-Routen sind ohnehin serverseitig durch die
+      // Session-Middleware (requireAdmin) abgesichert.
+      AppState.pinRequired = false;
+    }
+    AppState.pinChecked = true;
+  }
+
+  if (!AppState.pinRequired || AppState.pinVerified) {
+    return true;
+  }
+
+  renderPinGate(app);
+  return false;
+}
+
+function renderPinGate(app) {
+  app.innerHTML = `
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-black px-4">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mb-3">
+            <i class="fas fa-lock text-3xl text-white"></i>
+          </div>
+          <h1 class="text-xl font-bold text-white">Zusätzlicher PIN-Schutz</h1>
+          <p class="text-slate-300 text-sm mt-1">Bitte PIN eingeben, um den Admin-Bereich zu öffnen.</p>
+        </div>
+        <div class="card p-6">
+          <form id="pin-gate-form" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-600 mb-1">PIN</label>
+              <input type="password" inputmode="numeric" id="pin-gate-input" class="form-input text-center text-lg tracking-widest" placeholder="••••" autofocus required>
+            </div>
+            <div id="pin-gate-error" class="hidden text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg p-2"></div>
+            <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+              <i class="fas fa-unlock"></i> Entsperren
+            </button>
+          </form>
+          <button onclick="doLogout()" class="w-full mt-3 text-xs text-slate-400 hover:text-slate-600 transition">
+            <i class="fas fa-right-from-bracket mr-1"></i> Abmelden
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const form = document.getElementById('pin-gate-form');
+  const errorBox = document.getElementById('pin-gate-error');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.classList.add('hidden');
+    const pin = document.getElementById('pin-gate-input').value;
+    try {
+      const res = await API.verifyPin(pin);
+      if (res.ok) {
+        AppState.pinVerified = true;
+        router();
+      } else {
+        errorBox.textContent = 'Falscher PIN. Bitte erneut versuchen.';
+        errorBox.classList.remove('hidden');
+        document.getElementById('pin-gate-input').value = '';
+        document.getElementById('pin-gate-input').focus();
+      }
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.remove('hidden');
+    }
+  });
 }
 
 window.addEventListener('hashchange', router);
@@ -140,5 +232,9 @@ registerRoute('/login', async (app) => {
 async function doLogout() {
   await API.logout();
   AppState.user = null;
+  // PIN-Gate-Status zurücksetzen, damit sich nach erneutem Login (ggf. als
+  // anderer Nutzer) niemand am Cache eines vorherigen "entsperrt"-Zustands vorbeischleicht.
+  AppState.pinVerified = false;
+  AppState.pinChecked = false;
   location.hash = '#/login';
 }
