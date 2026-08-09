@@ -18,7 +18,7 @@
 # ============================================================
 set -e
 
-REPO_URL="https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP.git"
+REPO_URL="https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git"
 INSTALL_DIR="${1:-/opt/hausverwaltung}"
 
 echo "============================================================"
@@ -37,26 +37,49 @@ case "$ARCH" in
   *) echo "    WARNUNG: Unbekannte/ungetestete Architektur ($ARCH). Fortsetzen auf eigenes Risiko." ;;
 esac
 
-TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
-echo "    Gesamt-RAM: ${TOTAL_RAM_MB} MB"
-if [ "$TOTAL_RAM_MB" -lt 900 ]; then
-  echo "    WARNUNG: Weniger als 1 GB RAM erkannt. Die App benoetigt mindestens ca. 300-500 MB frei."
-  echo "             Bitte unwichtige Container (z.B. testweise) stoppen, falls Probleme auftreten."
+# Robuste RAM-Erkennung: "free -m" liefert je nach Locale/Version/Coreutils-Variante
+# (z.B. manche minimalen Armbian-Images ohne "procps") teils eine leere/anders
+# formatierte Ausgabe zurück, wodurch der numerische Vergleich unten mit
+# "[: : Ganzzahliger Ausdruck erwartet" fehlschlägt. Daher: zuerst /proc/meminfo
+# (immer im gleichen Format vorhanden), "free -m" nur als Fallback, und am Ende
+# zusätzlich auf eine gültige Zahl prüfen, bevor verglichen wird.
+TOTAL_RAM_MB=""
+if [ -r /proc/meminfo ]; then
+  TOTAL_RAM_KB=$(awk '/^MemTotal:/{print $2}' /proc/meminfo)
+  if [ -n "$TOTAL_RAM_KB" ]; then
+    TOTAL_RAM_MB=$((TOTAL_RAM_KB / 1024))
+  fi
+fi
+if [ -z "$TOTAL_RAM_MB" ] && command -v free >/dev/null 2>&1; then
+  TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
+fi
+echo "    Gesamt-RAM: ${TOTAL_RAM_MB:-unbekannt} MB"
+if [ -n "$TOTAL_RAM_MB" ] && [ "$TOTAL_RAM_MB" -eq "$TOTAL_RAM_MB" ] 2>/dev/null; then
+  if [ "$TOTAL_RAM_MB" -lt 900 ]; then
+    echo "    WARNUNG: Weniger als 1 GB RAM erkannt. Die App benoetigt mindestens ca. 300-500 MB frei."
+    echo "             Bitte unwichtige Container (z.B. testweise) stoppen, falls Probleme auftreten."
+  else
+    echo "    OK: Ausreichend RAM vorhanden."
+  fi
 else
-  echo "    OK: Ausreichend RAM vorhanden."
+  echo "    HINWEIS: RAM-Menge konnte nicht ermittelt werden – Pruefung wird uebersprungen."
 fi
 
-FREE_DISK_MB=$(df -Pm / | awk 'NR==2{print $4}')
-echo "    Freier Speicherplatz auf /: ${FREE_DISK_MB} MB"
-if [ "$FREE_DISK_MB" -lt 2000 ]; then
-  echo "    WARNUNG: Weniger als 2 GB frei. Docker-Images + Datenbank benoetigen dauerhaft Platz."
+FREE_DISK_MB=$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}')
+echo "    Freier Speicherplatz auf /: ${FREE_DISK_MB:-unbekannt} MB"
+if [ -n "$FREE_DISK_MB" ] && [ "$FREE_DISK_MB" -eq "$FREE_DISK_MB" ] 2>/dev/null; then
+  if [ "$FREE_DISK_MB" -lt 2000 ]; then
+    echo "    WARNUNG: Weniger als 2 GB frei. Docker-Images + Datenbank benoetigen dauerhaft Platz."
+  else
+    echo "    OK: Ausreichend Speicherplatz vorhanden."
+  fi
 else
-  echo "    OK: Ausreichend Speicherplatz vorhanden."
+  echo "    HINWEIS: Freier Speicherplatz konnte nicht ermittelt werden – Pruefung wird uebersprungen."
 fi
 
-CPU_CORES=$(nproc)
-echo "    CPU-Kerne: ${CPU_CORES}"
-if [ "$CPU_CORES" -lt 2 ]; then
+CPU_CORES=$(nproc 2>/dev/null || echo "")
+echo "    CPU-Kerne: ${CPU_CORES:-unbekannt}"
+if [ -n "$CPU_CORES" ] && [ "$CPU_CORES" -eq "$CPU_CORES" ] 2>/dev/null && [ "$CPU_CORES" -lt 2 ]; then
   echo "    HINWEIS: Nur 1 CPU-Kern erkannt. Der Docker-Build (npm/vite) kann dadurch mehrere Minuten dauern."
 fi
 echo ""

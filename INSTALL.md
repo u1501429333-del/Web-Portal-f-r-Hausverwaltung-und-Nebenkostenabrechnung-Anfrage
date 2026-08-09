@@ -104,7 +104,7 @@ ausführt: Systemcheck → Docker-Check → Repository klonen → Image bauen �
 
 ```bash
 # Einmalig herunterladen und ausführen (klont automatisch nach /opt/hausverwaltung):
-curl -fsSL https://raw.githubusercontent.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP/main/scripts/install.sh -o /tmp/install.sh
+curl -fsSL https://raw.githubusercontent.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage/main/scripts/install.sh -o /tmp/install.sh
 bash /tmp/install.sh
 ```
 
@@ -120,7 +120,7 @@ Das Skript zeigt am Ende die erreichbare URL und die Standard-Zugangsdaten an.
 **Was das Skript im Detail macht** (siehe `scripts/install.sh`):
 1. Prüft Architektur, RAM, Speicherplatz, CPU-Kerne (siehe Schritt 0) und gibt Warnungen aus, bricht aber nicht ab.
 2. Prüft ob Docker + `docker compose` Plugin vorhanden sind, installiert Docker nur falls nötig.
-3. Klont `https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP.git` nach `/opt/hausverwaltung` (falls noch nicht vorhanden).
+3. Klont `https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git` nach `/opt/hausverwaltung` (falls noch nicht vorhanden).
 4. Führt `docker compose build` aus (baut das Image – Node 20, installiert Abhängigkeiten, führt `npm run build` aus).
 5. Führt `docker compose up -d` aus (startet den Container im Hintergrund, `restart: unless-stopped`).
 6. Beim Container-Start wendet der Entrypoint automatisch alle Datenbank-Migrationen an (`docker/entrypoint.sh`) – beim allerersten Start wird die komplette Datenbank inkl. Demo-Daten angelegt, bei späteren Starts nur neue Migrationen.
@@ -137,7 +137,7 @@ Verwaltung nutzen willst:
 ```bash
 sudo mkdir -p /opt/hausverwaltung
 sudo chown "$USER":"$USER" /opt/hausverwaltung
-git clone https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP.git /opt/hausverwaltung
+git clone https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git /opt/hausverwaltung
 cd /opt/hausverwaltung
 chmod +x scripts/*.sh docker/entrypoint.sh
 ```
@@ -178,7 +178,7 @@ Erwartete Ausgabe in den Logs (nach ca. 5–15 Sekunden):
 Da Portainer bereits läuft, kannst du den Stack auch dort einbinden:
 1. Portainer öffnen → **Stacks** → **Add stack**.
 2. Namen vergeben, z. B. `hausverwaltung`.
-3. Bei "Build method" **Repository** wählen, Repo-URL `https://github.com/dunyali58xx-ship-it/Hausverwaltung-Software-APP.git`, Branch `main`, Compose-Pfad `docker-compose.yml`.
+3. Bei "Build method" **Repository** wählen, Repo-URL `https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git`, Branch `main`, Compose-Pfad `docker-compose.yml`.
 4. **Deploy the stack** klicken. Portainer baut und startet den Container genauso wie `docker compose up -d`.
 5. Fortschritt/Logs siehst du danach direkt im Portainer-UI unter dem Stack → Container `hausverwaltung`.
 
