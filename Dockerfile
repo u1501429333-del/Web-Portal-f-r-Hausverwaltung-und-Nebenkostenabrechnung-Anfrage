@@ -1,5 +1,5 @@
 # ============================================================
-# Hausverwaltung Portal – Docker-Image für Selbst-Hosting
+# UHV-Web-Portal (v3) – Docker-Image für Selbst-Hosting
 # (z.B. auf TV-Box / Amlogic S912 mit Armbian, ARM64)
 #
 # Wichtiger Hinweis zur Architektur:

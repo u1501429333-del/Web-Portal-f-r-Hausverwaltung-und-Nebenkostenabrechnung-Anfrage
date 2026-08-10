@@ -38,9 +38,9 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
             ${AppState.branding?.logo_data_url
               ? `<img src="${AppState.branding.logo_data_url}" alt="Logo" class="h-8 max-w-[40px] object-contain rounded bg-white p-0.5" />`
               : '<i class="fas fa-building-shield text-blue-400 text-xl"></i>'}
-            <span class="font-bold text-white text-lg truncate">${escapeHtml(AppState.branding?.app_name || 'Hausverwaltung')}</span>
+            <span class="font-bold text-white text-lg truncate">${escapeHtml(AppState.branding?.app_name || 'UHV-Web-Portal')}</span>
           </div>
-          <p class="text-xs text-slate-400 mt-1">${isAdmin ? 'Admin-Bereich' : 'Mieter-Portal'}</p>
+          <p class="text-xs text-slate-400 mt-1">${isAdmin ? 'Admin-Bereich' : 'Mieter-Portal'} <span class="text-slate-500">· v3</span></p>
         </div>
         <nav class="flex-1 p-3 space-y-1">
           ${navItems
@@ -54,6 +54,9 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
         <div class="p-3 border-t border-slate-700">
           <div class="px-3 py-2 text-xs text-slate-400">Angemeldet als</div>
           <div class="px-3 pb-2 text-sm font-medium text-white truncate">${escapeHtml(AppState.user?.name || AppState.user?.email || '')}</div>
+          ${isAdmin && AppState.pinRequired ? `<button onclick="lockPinGate()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700/60 transition">
+            <i class="fas fa-lock"></i> Admin-Bereich sperren
+          </button>` : ''}
           <button onclick="doLogout()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-300 hover:bg-red-900/40 transition">
             <i class="fas fa-right-from-bracket"></i> Abmelden
           </button>

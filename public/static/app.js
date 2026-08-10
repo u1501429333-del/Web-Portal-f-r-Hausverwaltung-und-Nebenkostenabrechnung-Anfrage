@@ -174,7 +174,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 registerRoute('/login', async (app) => {
   try { await ensureBrandingLoaded(); } catch {}
-  const branding = AppState.branding || { app_name: 'Hausverwaltung Portal', logo_data_url: '' };
+  const branding = AppState.branding || { app_name: 'UHV-Web-Portal', logo_data_url: '' };
   app.innerHTML = `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 via-blue-800 to-slate-900 px-4">
       <div class="w-full max-w-md">
@@ -184,7 +184,7 @@ registerRoute('/login', async (app) => {
               ? `<img src="${branding.logo_data_url}" alt="Logo" class="w-full h-full object-contain p-1" />`
               : '<i class="fas fa-building-shield text-3xl text-white"></i>'}
           </div>
-          <h1 class="text-2xl font-bold text-white">${escapeHtml(branding.app_name || 'Hausverwaltung Portal')}</h1>
+          <h1 class="text-2xl font-bold text-white">${escapeHtml(branding.app_name || 'UHV-Web-Portal')} <span class="text-xs font-normal text-blue-300 align-super">v3</span></h1>
           <p class="text-blue-200 text-sm mt-1">Nebenkostenabrechnung &amp; Mieterverwaltung</p>
         </div>
         <div class="card p-8">
@@ -228,6 +228,13 @@ registerRoute('/login', async (app) => {
     }
   });
 });
+
+// Manuelles Sperren des Admin-Bereichs (Button in der Sidebar) – setzt nur den
+// Verifikations-Status zurück, ohne den User abzumelden.
+function lockPinGate() {
+  AppState.pinVerified = false;
+  router();
+}
 
 async function doLogout() {
   await API.logout();

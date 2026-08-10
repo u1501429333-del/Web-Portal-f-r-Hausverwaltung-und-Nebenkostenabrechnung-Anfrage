@@ -1,5 +1,5 @@
 # ============================================================
-# Hausverwaltung Portal – docker-compose für Self-Hosting
+# UHV-Web-Portal (v3) – docker-compose für Self-Hosting
 # Getestet für: Amlogic S912 TV-Box, Armbian Linux 6.1.149-ophub,
 #               Debian bookworm, ARM64 (arm64/aarch64)
 #
@@ -13,8 +13,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: hausverwaltung-portal:latest
-    container_name: hausverwaltung
+    image: uhv-web-portal:latest
+    container_name: uhv-web-portal
     restart: unless-stopped
     ports:
       # Host-Port links, Container-Port rechts.
@@ -25,6 +25,12 @@ services:
       # Persistiert die komplette Datenbank (D1-SQLite: Objekte, Wohnungen,
       # Mieter, Zählerstände, Kosten, Dokumente, Logo/Branding, Logins).
       # OHNE dieses Volume gehen bei jedem Container-Neustart alle Daten verloren!
+      # WICHTIG: Der Volume-Name "hausverwaltung_data" wird bewusst NICHT auf
+      # "uhv_data" umbenannt, obwohl die App jetzt "UHV-Web-Portal" heißt –
+      # Docker würde bei einem geänderten Namen ein NEUES, leeres Volume
+      # anlegen und alle bereits erfassten Objekte/Wohnungen/Mieter/
+      # Zählerstände/Kosten bestehender Installationen wären scheinbar
+      # verschwunden (das alte Volume bliebe zwar erhalten, aber unverknüpft).
       - hausverwaltung_data:/app/.wrangler/state
     environment:
       - NODE_ENV=production

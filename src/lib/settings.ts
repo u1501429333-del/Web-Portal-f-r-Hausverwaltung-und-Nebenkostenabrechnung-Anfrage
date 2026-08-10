@@ -5,7 +5,7 @@
 import type { Branding, Einstellungen } from './types'
 
 const DEFAULTS: Record<string, string> = {
-  app_name: 'Hausverwaltung Portal',
+  app_name: 'UHV-Web-Portal',
   logo_data_url: '',
   heizkosten_verbrauch_anteil: '0.7',
   zuschlag_9a_pct: '0',
@@ -26,7 +26,7 @@ async function getAllRaw(db: D1Database): Promise<Record<string, string>> {
 export async function getBranding(db: D1Database): Promise<Branding> {
   const map = await getAllRaw(db)
   return {
-    app_name: map.app_name || 'Hausverwaltung Portal',
+    app_name: map.app_name || 'UHV-Web-Portal',
     logo_data_url: map.logo_data_url || '',
   }
 }
@@ -39,7 +39,7 @@ export async function setBranding(db: D1Database, b: Partial<Branding>): Promise
 export async function getEinstellungen(db: D1Database): Promise<Einstellungen> {
   const map = await getAllRaw(db)
   return {
-    app_name: map.app_name || 'Hausverwaltung Portal',
+    app_name: map.app_name || 'UHV-Web-Portal',
     logo_data_url: map.logo_data_url || '',
     heizkosten_verbrauch_anteil: Number(map.heizkosten_verbrauch_anteil) || 0.7,
     zuschlag_9a_pct: Number(map.zuschlag_9a_pct) || 0,

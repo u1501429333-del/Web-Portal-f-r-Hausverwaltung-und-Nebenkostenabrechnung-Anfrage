@@ -16,7 +16,7 @@ function fmtEuro(n: number): string {
   return (n ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
-const emptyBranding: Branding = { app_name: 'Hausverwaltung Portal', logo_data_url: '' }
+const emptyBranding: Branding = { app_name: 'UHV-Web-Portal', logo_data_url: '' }
 
 const baseStyles = `
   <style>

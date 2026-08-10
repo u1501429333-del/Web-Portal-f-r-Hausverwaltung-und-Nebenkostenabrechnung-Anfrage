@@ -25,7 +25,7 @@ async function ensureBrandingLoaded() {
     try {
       AppState.branding = await API.getEinstellungen();
     } catch {
-      AppState.branding = { app_name: 'Hausverwaltung Portal', logo_data_url: '' };
+      AppState.branding = { app_name: 'UHV-Web-Portal', logo_data_url: '' };
     }
   }
   return AppState.branding;

@@ -1,7 +1,7 @@
-# Hausverwaltung Portal – Nebenkostenabrechnung für Mehrfamilienhäuser
+# UHV-Web-Portal v3 – Nebenkostenabrechnung für Mehrfamilienhäuser
 
 ## Projektübersicht
-- **Name**: Hausverwaltung Portal
+- **Name**: UHV-Web-Portal v3
 - **Ziel**: Vollständige Verwaltung eines (oder mehrerer) Mehrfamilienhäuser inkl.
   rechtskonformer Nebenkostenabrechnung nach deutschem Recht (BetrKV, HeizkostenV),
   mit getrennten Rollen für Admin (Hausverwaltung) und Mieter.

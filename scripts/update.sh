@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Update-Skript: Hausverwaltung Portal (Docker / TV-Box)
+# Update-Skript: UHV-Web-Portal v3 (Docker / TV-Box)
 #
 # Aktualisiert die App auf die neueste Version aus GitHub und
 # startet den Container neu. Die Datenbank (Docker-Volume

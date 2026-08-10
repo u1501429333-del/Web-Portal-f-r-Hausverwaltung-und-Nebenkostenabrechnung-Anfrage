@@ -69,7 +69,7 @@ async function loadEinstellungen() {
         <form id="branding-form" class="space-y-4">
           <div>
             <label class="text-xs font-semibold text-slate-500">App-Name</label>
-            <input class="form-input" name="app_name" value="${escapeHtml(branding.app_name || '')}" placeholder="Hausverwaltung Portal">
+            <input class="form-input" name="app_name" value="${escapeHtml(branding.app_name || '')}" placeholder="UHV-Web-Portal">
           </div>
           <div>
             <label class="text-xs font-semibold text-slate-500">Logo (PNG/JPG, empfohlen max. 500 KB, transparenter Hintergrund)</label>

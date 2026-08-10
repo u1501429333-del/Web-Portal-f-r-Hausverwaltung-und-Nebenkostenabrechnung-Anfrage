@@ -15,5 +15,5 @@ npx wrangler d1 migrations apply webapp-production --local || {
   echo "[entrypoint] WARNUNG: Migration fehlgeschlagen oder nichts zu tun – fahre trotzdem fort."
 }
 
-echo "[entrypoint] Starte Hausverwaltung Portal auf Port ${PORT:-3000} ..."
+echo "[entrypoint] Starte UHV-Web-Portal v3 auf Port ${PORT:-3000} ..."
 exec npx wrangler pages dev dist --d1=webapp-production --local --ip 0.0.0.0 --port "${PORT:-3000}"

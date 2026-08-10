@@ -8,7 +8,7 @@
 #   bash scripts/backup.sh
 #
 # Die Backups werden im Ordner "backups/" mit Zeitstempel
-# abgelegt, z.B. backups/hausverwaltung_backup_2026-08-05_14-30.tar.gz
+# abgelegt, z.B. backups/uhv-web-portal_backup_2026-08-05_14-30.tar.gz
 # ============================================================
 set -e
 
@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 
 TS=$(date +%Y-%m-%d_%H-%M)
 OUTDIR="backups"
-OUTFILE="$OUTDIR/hausverwaltung_backup_${TS}.tar.gz"
+OUTFILE="$OUTDIR/uhv-web-portal_backup_${TS}.tar.gz"
 mkdir -p "$OUTDIR"
 
 echo "==> Sichere Docker-Volume 'hausverwaltung_data' ..."

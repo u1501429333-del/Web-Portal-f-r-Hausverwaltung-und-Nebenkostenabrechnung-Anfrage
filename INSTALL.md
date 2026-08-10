@@ -1,4 +1,4 @@
-# Installationsanleitung – Hausverwaltung Portal auf der TV-Box (Amlogic S912 / Armbian)
+# Installationsanleitung – UHV-Web-Portal v3 auf der TV-Box (Amlogic S912 / Armbian)
 
 Diese Anleitung ist speziell zugeschnitten auf dein System:
 
@@ -168,7 +168,7 @@ docker compose logs -f hausverwaltung   # Strg+C zum Beenden der Log-Ansicht
 Erwartete Ausgabe in den Logs (nach ca. 5–15 Sekunden):
 ```
 [entrypoint] Wende D1-Migrationen an ...
-[entrypoint] Starte Hausverwaltung Portal auf Port 3000 ...
+[entrypoint] Starte UHV-Web-Portal v3 auf Port 3000 ...
 ⎔ Starting local server...
 [wrangler] Ready on http://0.0.0.0:3000
 ```
