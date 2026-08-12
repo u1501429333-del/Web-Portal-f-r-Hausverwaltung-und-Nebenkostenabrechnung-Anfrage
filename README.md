@@ -58,6 +58,50 @@
   – ersetzt fest verdrahtete Testdaten.
 - **Mieter einladen**: Admin kann für jeden Mieter ein Login anlegen/zurücksetzen
   (idempotent – erneutes Einladen aktualisiert statt zu duplizieren).
+- **WMZ kWh/MWh-Korrektheit**: Jeder Wärmemengenzähler (WMZ Heizung/Boiler) hat in
+  den Stammdaten ein explizites **Ableseeinheit-Feld (kWh oder MWh)**. Die
+  Verbrauchsberechnung (`normalizeWaermeeinheitZuKwh()`) normalisiert den erfassten
+  Zählerwert unabhängig von der am Gerät angezeigten Einheit **immer auf kWh**, bevor
+  er in die Nebenkostenabrechnung einfließt – Geräte, die nur MWh anzeigen
+  (z. B. Sensus PolluCom E/F), liefern dadurch garantiert korrekte Abrechnungsbeträge.
+  Serverseitige Validierung (`ERLAUBTE_EINHEITEN`) verhindert unpassende Einheiten je
+  Zählertyp (z. B. Wasserzähler nur m³). Der CSV-Export für den Steuerberater enthält
+  zusätzlich eine normalisierte kWh-Spalte neben dem Rohwert.
+- **Korrigierte Sensus-WMZ-Ablesehilfe**: Die Bedienungsanleitung beschreibt jetzt
+  fachlich korrekt die 6 echten Geräte-Ebenen (L1 Benutzerebene = für Mieter
+  relevant, L2 Stichtagsebene, L3 Archivebene, L4 Serviceebene, L5
+  Tariffunktionsebene, L6 Parameterebene = passwortgeschützt/eichrechtlich
+  gesperrt) inkl. der echten Navigationsschritte (roten Knopf 5 Sek. halten →
+  Ebene wählen → 2 Sek. halten zum Öffnen → Werte durchblättern) sowie einer
+  Warnung zur MWh/kWh-Anzeige.
+- **Mietspiegel-Modul (Overath, PLZ 51491)**: Neue Datenbanktabellen
+  `mietspiegel_ausgaben` / `mietspiegel_werte` und API (`/api/mietspiegel/*`) mit der
+  vollständigen amtlichen Nettokaltmieten-Tabelle (96 Wertkombinationen aus
+  Baualtersklasse × Größenklasse × Ausstattung × Wohnlage) des **Mietspiegels für
+  frei finanzierte Wohnungen in Bergisch Gladbach, Stand 01.01.2026** (Haus und
+  Grund Rhein-Berg e.V.). Overath besitzt keinen eigenen Mietspiegel, ist aber laut
+  amtlicher Erläuterung Nr. 6 **uneingeschränkt eingeschlossen** (ebenso Odenthal und
+  Rösrath; Kürten mit 10 %-Abschlag) – rechtlich ein **einfacher Mietspiegel nach
+  §558c BGB**. `GET /api/mietspiegel/einordnung?baujahr=&groesse_m2=` liefert die
+  passende Nettokaltmieten-Spanne (€/m²) zur Einordnung einer Wohnung.
+  **Wichtiger Hinweis zur 2025-Ausgabe**: Die Vorgänger-Ausgabe (Stand 2024, welche
+  während 2025 gültig war) ist beim Herausgeber kostenpflichtig (3,50 €) und nicht
+  frei als PDF verfügbar; ihre genauen Tabellenwerte konnten daher nicht in die
+  Datenbank übernommen werden. Aktuell ist ausschließlich die **Ausgabe 2026**
+  hinterlegt (`ist_aktuell = 1`), die ab 01.01.2026 rechtlich maßgeblich ist. Die
+  Datenstruktur (`mietspiegel_ausgaben`) ist bewusst mehrjahresfähig angelegt, sodass
+  die 2024/2025-Ausgabe jederzeit nachträglich per Migration ergänzt werden kann,
+  sobald sie beschafft wurde.
+- **Automatische Mietspiegel-Update-Prüfung (realistische Umsetzung)**: Da Cloudflare
+  Workers keine eigenständigen Hintergrundprozesse/Web-Scraper zur Laufzeit ausführen
+  können, wurde bewusst **kein** simuliertes "automatisches Herunterladen" umgesetzt.
+  Stattdessen ist die Datenstruktur so vorbereitet (`einstellungen.mietspiegel_letzte_pruefung`,
+  `mietspiegel_email_erinnerung`), dass eine spätere Erinnerungsfunktion (Dashboard-Banner
+  bzw. E-Mail zu Jahresbeginn: „Bitte prüfen, ob eine neue Mietspiegel-Ausgabe erschienen
+  ist") ergänzt werden kann. Eine echte automatische Beschaffung neuer amtlicher Daten
+  ist auf dieser Plattform technisch nicht möglich und würde zudem eine manuelle
+  Prüfung durch den Vermieter nicht ersetzen (Mietspiegel sind amtliche, kostenpflichtige
+  bzw. urheberrechtlich geschützte Dokumente).
 
 ## URLs
 - **Lokale Entwicklung (Sandbox)**: `http://localhost:3000` (via PM2 + `wrangler pages dev`)
@@ -89,6 +133,7 @@
 | Unterlagen | `GET/POST/DELETE /unterlagen/*` (Ordner: allgemein/steuerberater/zaehlerfotos) | Admin+Mieter (eigene) |
 | Dokumente | `GET /dokumente/wmz-ablesehilfe/html`, `GET /dokumente/ablesedatenblatt/:wohnungId/:jahr` | Admin+Mieter (eigene Wohnung) |
 | Objekte/Wohnungen | `POST /objekte` (erzeugt automatisch 17 BetrKV-Kostenarten), `POST /objekte/:id/wohnungen` (erzeugt automatisch 3 Standardzähler) | Admin |
+| Mietspiegel | `GET /mietspiegel/aktuell`, `GET /mietspiegel/ausgaben`, `GET /mietspiegel/einordnung?baujahr=&groesse_m2=` (Overath/Bergisch Gladbach, Stand 2026) | Admin |
 
 ## Benutzerhandbuch (Kurzfassung)
 1. **Admin-Login** mit den Zugangsdaten aus der Demo-Migration (siehe unten) oder
@@ -117,6 +162,11 @@
 | Mieter | `mieter1@example.com`       | `mieter123`|
 
 ## Noch nicht implementiert
+- Mietspiegel-Admin-UI (Frontend-Ansicht der Tabelle + Wohnungs-Einordnung im
+  Browser) – Backend/API und Datenbank sind vollständig fertig, die Anzeige im
+  Admin-Bereich fehlt noch.
+- Mietspiegel-Ausgabe 2024/2025 (kostenpflichtig beim Herausgeber, nicht frei
+  verfügbar) – aktuell ist nur die Ausgabe 2026 hinterlegt (siehe Hinweis oben).
 - UI-Dialog zum Ändern des eigenen Passworts (aktuell nur per DB/Admin-Reset möglich).
 - Echter (serverseitiger) E-Mail-Versand von Dokumenten/CSV-Exporten (aktuell nur
   `mailto:`-Link bzw. HTML-Ansicht/Druck – kein SMTP/API-Versand).
@@ -145,7 +195,7 @@
 - **Status**: ✅ Aktiv (lokale Sandbox-Instanz läuft), Docker-Self-Hosting-Setup
   bereitgestellt (`Dockerfile`, `docker-compose.yml`, `scripts/install.sh`,
   `scripts/update.sh`, `scripts/backup.sh`) – siehe [`INSTALL.md`](./INSTALL.md).
-- **Letzte Aktualisierung**: 2026-08-08
+- **Letzte Aktualisierung**: 2026-08-12
 
 ## Entwicklung (lokal / Sandbox)
 ```bash

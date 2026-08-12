@@ -6,6 +6,7 @@ import { objekteRoutes } from './routes/objekte'
 import { wohnungenRoutes } from './routes/wohnungen'
 import { mieterRoutes } from './routes/mieter'
 import { zaehlerRoutes } from './routes/zaehler'
+import { mietspiegelRoutes } from './routes/mietspiegel'
 import { kostenRoutes } from './routes/kosten'
 import { abrechnungRoutes } from './routes/abrechnung'
 import { dokumenteRoutes } from './routes/dokumente'
@@ -27,6 +28,7 @@ app.route('/api/objekte', objekteRoutes)
 app.route('/api/wohnungen', wohnungenRoutes)
 app.route('/api/mieter', mieterRoutes)
 app.route('/api/zaehler', zaehlerRoutes)
+app.route('/api/mietspiegel', mietspiegelRoutes)
 app.route('/api/kosten', kostenRoutes)
 app.route('/api/abrechnung', abrechnungRoutes)
 app.route('/api/dokumente', dokumenteRoutes)

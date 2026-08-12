@@ -398,34 +398,55 @@ export function generateWmzAnleitung(objekt: Objekt, branding: Branding = emptyB
   return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>WMZ-Ablesehilfe</title>${baseStyles}
   <style>
     .step { display:flex; gap:12px; margin: 10px 0; align-items:flex-start; }
-    .step .num { flex:0 0 30px; height:30px; border-radius:50%; background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+    .step .num { flex:0 0 34px; height:34px; border-radius:50%; background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; }
     .step .txt { flex:1; }
+    .step.readstep .num { background:#059669; }
     .tip-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:10px 14px; margin:14px 0; font-size:11.5px; }
+    .warn-box { background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px 14px; margin:14px 0; font-size:11.5px; }
     .display-box { display:inline-block; background:#0f172a; color:#4ade80; font-family: monospace; padding:6px 14px; border-radius:4px; font-size:13px; }
+    table.levels { width:100%; border-collapse:collapse; font-size:11px; margin:10px 0; }
+    table.levels th, table.levels td { border:1px solid #cbd5e1; padding:6px 8px; text-align:left; vertical-align:top; }
+    table.levels th { background:#f1f5f9; }
   </style>
   </head>
   <body>
-    ${docHeader('WMZ-Ablesehilfe', `Bedienungsanleitung Wärmemengenzähler (Sensus PolluCom F/E) · ${objekt.name}`, branding)}
+    ${docHeader('WMZ-Ablesehilfe', `Bedienungsanleitung Wärmemengenzähler (Sensus PolluCom E/F) · ${objekt.name}`, branding)}
 
-    <p>Diese Anleitung erklärt Schritt für Schritt, wie Sie Ihren Wärmemengenzähler (Heizung) bzw. Wasserzähler selbst ablesen können. Bitte lesen Sie <span class="paragraf">jährlich zum Stichtag</span> (siehe Erinnerung im Mieterportal) den aktuellen Zählerstand ab und melden Sie ihn über das Mieterportal.</p>
+    <p>Diese Anleitung erklärt Schritt für Schritt, wie Sie Ihren Wärmemengenzähler (WMZ, Heizung) selbst ablesen. Bitte lesen Sie <span class="paragraf">jährlich zum Stichtag</span> (siehe Erinnerung im Mieterportal) den aktuellen Zählerstand ab und melden Sie ihn über das Mieterportal.</p>
 
-    <h2>Anzeige-Tasten am Gerät</h2>
-    <div class="step"><div class="num">L1</div><div class="txt">Kurzer Tastendruck (Taste rechts unten am Display) &rarr; zeigt den <span class="paragraf">aktuellen Wärmeverbrauch</span> in <span class="display-box">MWh</span> bzw. <span class="display-box">kWh</span> an. <b>Dies ist der Wert, den Sie ablesen und übertragen müssen.</b></div></div>
-    <div class="step"><div class="num">L2</div><div class="txt">Taste erneut kurz drücken &rarr; weitere Zusatzwerte (z. B. Betriebsstunden) werden nacheinander angezeigt.</div></div>
-    <div class="step"><div class="num">L3</div><div class="txt">Taste 8 Sekunden gedrückt halten, danach 2× kurz (je ca. 2 Sekunden) drücken &rarr; Zusatzmenü mit Durchflussmenge (m³), Vor-/Rücklauftemperatur und aktueller Leistung. <span class="small">(Für die normale Ablesung nicht erforderlich.)</span></div></div>
-    <div class="step"><div class="num">L4</div><div class="txt">Im Zusatzmenü: Navigation zu monatlichen Rückblick-Werten möglich (Anzeige "Monat", Datum blinkt).</div></div>
-    <div class="step"><div class="num">L5</div><div class="txt">Mit "Zurück" (lange gedrückt halten) gelangen Sie wieder zur Startanzeige "Heute" / aktueller Stand.</div></div>
-    <div class="step"><div class="num">L6</div><div class="txt">Erscheint im Display ein <span class="display-box">F</span> (Störungshinweis / Fehlercode), liegt eine technische Störung vor. Bitte umgehend die Hausverwaltung informieren – <b>nicht selbst öffnen oder reparieren.</b></div></div>
+    <div class="warn-box"><i class="paragraf">Wichtiger Hinweis zur Einheit:</i> Sensus-Wärmemengenzähler (PolluCom E/F) zeigen den Gesamt-Wärmeverbrauch werksseitig häufig in <b>MWh</b> (Megawattstunden) an, <u>nicht</u> in kWh. Bitte lesen Sie die Einheit direkt am Display ab (steht meist klein neben dem Zahlenwert, z. B. "MWh" oder "kWh") und prüfen Sie, dass in den Zähler-Stammdaten der Verwaltung ("Wohnung → Zähler bearbeiten") exakt diese Einheit hinterlegt ist. Die App rechnet den Wert dann automatisch korrekt auf kWh für die Nebenkostenabrechnung um. Eine falsch hinterlegte Einheit führt zu einer um den Faktor 1000 falschen Kostenverteilung!</div>
 
-    <div class="tip-box"><i class="paragraf">Tipp:</i> Fotografieren Sie den Zähler inkl. Displayanzeige und laden Sie das Foto im Mieterportal unter „Unterlagen" hoch – das erleichtert die Prüfung durch die Hausverwaltung.</div>
+    <h2>Die 6 Ebenen (L1–L6) des Geräts</h2>
+    <p>Das Display des PolluCom E/F kennt sechs sogenannte "Ebenen", zwischen denen Sie über die rote Taste an der Gerätefront navigieren. Für die normale jährliche Ablesung benötigen Sie ausschließlich <b>Ebene L1 (Benutzerebene)</b> – die übrigen Ebenen sind für Wartung/Service und für Sie nicht relevant bzw. teilweise passwortgeschützt.</p>
+    <table class="levels">
+      <thead><tr><th>Ebene</th><th>Name</th><th>Inhalt</th><th>Für Mieter relevant?</th></tr></thead>
+      <tbody>
+        <tr><td><b>L1</b></td><td>Benutzerebene</td><td>Aktueller kumulierter Wärmeverbrauch (Gesamtsumme seit Inbetriebnahme) in MWh oder kWh, außerdem Durchfluss, Leistung, Temperaturen Vor-/Rücklauf.</td><td><b>Ja – hier ablesen!</b></td></tr>
+        <tr><td>L2</td><td>Stichtagsebene</td><td>Werte zu festen Stichtagen (z. B. 31.12. Jahresendwert), von der Hausverwaltung/Ableser genutzt für die Jahresabrechnung.</td><td>Optional (informativ)</td></tr>
+        <tr><td>L3</td><td>Archivebene</td><td>Monatliche Rückblick-Werte der letzten ca. 15–24 Monate (Verbrauchshistorie).</td><td>Nein</td></tr>
+        <tr><td>L4</td><td>Serviceebene</td><td>Techn. Diagnose-/Störungsdaten für den Wartungsdienst.</td><td>Nein</td></tr>
+        <tr><td>L5</td><td>Tariffunktionsebene</td><td>Tarifierungsparameter (nur bei Geräten mit Tariffunktion relevant).</td><td>Nein</td></tr>
+        <tr><td>L6</td><td>Parameterebene</td><td>Gerätekonfiguration – <b>passwortgeschützt</b>, nur für Fachpersonal/Eichamt.</td><td>Nein (gesperrt)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>So navigieren Sie zur Ablesung (Schritt für Schritt)</h2>
+    <div class="step readstep"><div class="num">1</div><div class="txt">Die rote Taste an der Gerätefront für <b>ca. 5 Sekunden gedrückt halten</b>, bis im Display die Ebenen-Auswahl erscheint (Anzeige z. B. "L1", blinkend).</div></div>
+    <div class="step readstep"><div class="num">2</div><div class="txt">Mit <b>kurzen Tastendrücken</b> durch die Ebenen L1 → L2 → L3 → L4 → L5 → L6 blättern. Für die normale Ablesung bei <span class="display-box">L1</span> stehen bleiben.</div></div>
+    <div class="step readstep"><div class="num">3</div><div class="txt">Die Taste bei angezeigtem <span class="display-box">L1</span> für <b>ca. 2 Sekunden gedrückt halten</b>, um in die Benutzerebene zu wechseln.</div></div>
+    <div class="step readstep"><div class="num">4</div><div class="txt">Innerhalb der Benutzerebene mit kurzen Tastendrücken durch die einzelnen Anzeigewerte blättern, bis der <span class="paragraf">Gesamt-Wärmeverbrauch</span> (Hauptzählwerk, meist das erste oder größte Zahlenfeld) erscheint. Direkt daneben/darunter steht die Einheit – <b>MWh</b> oder <b>kWh</b>. <b>Notieren Sie Zahlenwert UND Einheit exakt so, wie im Display angezeigt.</b></div></div>
+    <div class="step"><div class="num">5</div><div class="txt">Ohne weitere Eingabe kehrt das Display nach ca. <b>4 Minuten</b> automatisch zur Grundanzeige zurück (Stand-by). Ein erneuter Tastendruck ist jederzeit möglich, es geht dabei nichts verloren – der Zähler misst durchgehend weiter.</div></div>
+    <div class="step"><div class="num">6</div><div class="txt">Erscheint im Display ein <span class="display-box">F</span> gefolgt von einer Nummer (Störungs-/Fehlercode, z. B. "F1"), liegt eine technische Störung vor. Bitte umgehend die Hausverwaltung informieren – <b>nicht selbst öffnen oder Ebene L6 aufrufen</b> (Eichrecht, passwortgeschützt).</div></div>
+
+    <div class="tip-box"><i class="paragraf">Tipp:</i> Fotografieren Sie den Zähler inkl. Displayanzeige (Zahlenwert <b>und</b> Einheit gut lesbar) und laden Sie das Foto im Mieterportal unter „Unterlagen" hoch – das erleichtert die Prüfung durch die Hausverwaltung und verhindert Ablesefehler.</div>
 
     <h2>Wasserzähler (Warmwasser / Kaltwasser)</h2>
     <p>Die Wasserzähler zeigen den Verbrauch in <span class="display-box">m³</span> direkt über ein mechanisches Rollenzählwerk an – kein Tastendruck notwendig. Bitte lesen Sie alle schwarzen (ganze m³) und roten (Nachkommastellen) Ziffern von links nach rechts ab.</p>
 
     <h2>Wo trage ich den Wert ein?</h2>
-    <p>Melden Sie den abgelesenen Wert im Mieterportal unter „Zählerstände" oder verwenden Sie das separate Ablesedatenblatt (siehe Dokumente-Bereich).</p>
+    <p>Melden Sie den abgelesenen Wert (inkl. der abgelesenen Einheit MWh/kWh beim WMZ) im Mieterportal unter „Zählerstände" oder verwenden Sie das separate Ablesedatenblatt (siehe Dokumente-Bereich). Die Hausverwaltung pflegt die Einheit einmalig in den Zähler-Stammdaten – anschließend rechnet die App bei jeder Ablesung automatisch korrekt um.</p>
 
-    <p class="footer-note">Bei Fragen zur Ablesung wenden Sie sich an die Hausverwaltung. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
+    <p class="footer-note">Quelle der technischen Angaben: Sensus PolluCom E/F Betriebs- und Installationsanleitung (Hersteller-Originaldokumentation). Bei Fragen zur Ablesung wenden Sie sich an die Hausverwaltung. Erstellt: ${new Date().toLocaleDateString('de-DE')}</p>
   </body></html>`
 }
 

@@ -48,6 +48,7 @@ const API = {
 
   // Zähler
   listZaehlerByObjekt: (objektId) => api.get(`/zaehler/objekt/${objektId}`).then((r) => r.data),
+  getZaehler: (id) => api.get(`/zaehler/${id}`).then((r) => r.data),
   listZaehlerMitStand: (objektId, jahr) => api.get(`/zaehler/objekt/${objektId}/jahr/${jahr}`).then((r) => r.data),
   createZaehler: (data) => api.post('/zaehler', data).then((r) => r.data),
   updateZaehler: (id, data) => api.put(`/zaehler/${id}`, data).then((r) => r.data),

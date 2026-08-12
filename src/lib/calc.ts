@@ -31,19 +31,37 @@ export interface GebaeudeSummen {
   frischwasser_gesamt: number
 }
 
-/** Verbrauch = Zählerstand aktuelles Jahr − Zählerstand Vorjahr (0 falls kein Vorjahreswert existiert) */
+/** Rechnet einen Wärmemengen-Zählerwert unabhängig von der am physischen Gerät eingestellten/
+ *  abgelesenen Anzeige-Einheit auf kWh um. Viele Wärmemengenzähler (z.B. Sensus PolluCom E/F)
+ *  zeigen den Verbrauch werksseitig in MWh an, nicht in kWh — ohne diese Umrechnung würde ein in
+ *  MWh abgelesener Zähler in der Kostenverteilung um den Faktor 1000 zu niedrig gewichtet werden
+ *  (bzw. ein versehentlich als "kWh" gepflegter MWh-Wert die Verteilung massiv verzerren).
+ *  kWh ist die intern durchgängig verwendete Referenzeinheit (siehe auch WohnungVerbrauch/
+ *  GebaeudeSummen-Kommentare sowie die Anzeige in Mieterportal/Abrechnungs-PDF). */
+export function normalizeWaermeeinheitZuKwh(wert: number, einheit: string | null | undefined): number {
+  const e = (einheit || '').trim().toLowerCase()
+  if (e === 'mwh') return wert * 1000
+  if (e === 'gj' || e === 'gigajoule') return wert * 277.7778 // 1 GJ = 277,7778 kWh (informativ, falls je genutzt)
+  // 'kwh' oder unbekannt/leer -> unverändert (kWh ist die Default-Einheit in der DB, siehe Migration)
+  return wert
+}
+
+/** Verbrauch = Zählerstand aktuelles Jahr − Zählerstand Vorjahr (0 falls kein Vorjahreswert existiert).
+ *  Für WMZ-Zähler (Heizung/Boiler) wird der Verbrauch anhand der pro Zähler in den Stammdaten
+ *  hinterlegten Einheit (kWh/MWh) sofort auf kWh normalisiert, damit spätere Summenbildungen und
+ *  Verteilungs-Quotienten über mehrere Zähler mit ggf. unterschiedlicher Ableseeinheit korrekt bleiben. */
 async function verbrauchProZaehler(
   db: D1Database,
   objektId: number,
   jahr: number
-): Promise<Map<number, { verbrauch: number; vorwert: number; aktuell: number; typ: string; wohnung_id: number | null }>> {
+): Promise<Map<number, { verbrauch: number; vorwert: number; aktuell: number; typ: string; wohnung_id: number | null; einheit: string }>> {
   const zaehlerRows = await db
-    .prepare('SELECT id, typ, wohnung_id FROM zaehler WHERE objekt_id = ?')
+    .prepare('SELECT id, typ, wohnung_id, einheit FROM zaehler WHERE objekt_id = ?')
     .bind(objektId)
     .all()
   const result = new Map<
     number,
-    { verbrauch: number; vorwert: number; aktuell: number; typ: string; wohnung_id: number | null }
+    { verbrauch: number; vorwert: number; aktuell: number; typ: string; wohnung_id: number | null; einheit: string }
   >()
   for (const z of zaehlerRows.results as any[]) {
     const aktuellRow = await db
@@ -56,8 +74,13 @@ async function verbrauchProZaehler(
       .first<{ stand: number }>()
     const aktuell = aktuellRow?.stand ?? 0
     const vorwert = vorRow?.stand ?? 0
-    const verbrauch = Math.max(0, aktuell - vorwert)
-    result.set(z.id, { verbrauch, vorwert, aktuell, typ: z.typ, wohnung_id: z.wohnung_id })
+    let verbrauch = Math.max(0, aktuell - vorwert)
+    // Nur Wärmemengenzähler (Heizung/Boiler) können in MWh statt kWh geliefert werden und werden
+    // hier auf kWh normalisiert. Wasserzähler (m³) und "Sonstige" bleiben unverändert.
+    if (z.typ === 'wmz_heizung' || z.typ === 'wmz_boiler') {
+      verbrauch = normalizeWaermeeinheitZuKwh(verbrauch, z.einheit)
+    }
+    result.set(z.id, { verbrauch, vorwert, aktuell, typ: z.typ, wohnung_id: z.wohnung_id, einheit: z.einheit })
   }
   return result
 }

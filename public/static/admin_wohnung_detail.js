@@ -61,18 +61,35 @@ async function loadWohnungDetail(wohnungId) {
       <div class="card p-5">
         <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-gauge text-blue-600 mr-1"></i> Zähler dieser Wohnung</h3>
         <table class="data-table w-full text-sm">
-          <thead><tr><th>Bezeichnung</th><th>Typ</th><th>Einheit</th></tr></thead>
+          <thead><tr><th>Bezeichnung</th><th>Typ</th><th>Ableseeinheit</th><th></th></tr></thead>
           <tbody>
-            ${zaehlerDerWohnung.map((z) => `<tr><td>${escapeHtml(z.bezeichnung)} ${z.ebene ? '<span class="text-xs text-slate-400">(' + escapeHtml(z.ebene) + ')</span>' : ''}</td><td>${zaehlerTypLabel(z.typ)}</td><td>${escapeHtml(z.einheit)}</td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-slate-400 py-4">Keine Zähler zugeordnet.</td></tr>'}
+            ${zaehlerDerWohnung.map((z) => `<tr>
+              <td>${escapeHtml(z.bezeichnung)} ${z.ebene ? '<span class="text-xs text-slate-400">(' + escapeHtml(z.ebene) + ')</span>' : ''}</td>
+              <td>${zaehlerTypLabel(z.typ)}</td>
+              <td>${einheitBadge(z.typ, z.einheit)}</td>
+              <td class="text-right"><button class="text-slate-400 hover:text-blue-600" title="Zähler bearbeiten" onclick="openZaehlerModal(${wohnungId}, ${z.id})"><i class="fas fa-pen"></i></button></td>
+            </tr>`).join('') || '<tr><td colspan="4" class="text-center text-slate-400 py-4">Keine Zähler zugeordnet.</td></tr>'}
           </tbody>
         </table>
         <button id="btn-new-zaehler" class="mt-3 text-sm text-blue-600 font-semibold"><i class="fas fa-plus mr-1"></i> Zähler hinzufügen</button>
+        <p class="text-xs text-slate-400 mt-2"><i class="fas fa-circle-info mr-1"></i>Bei Wärmemengenzählern (WMZ) unbedingt die am Gerät tatsächlich angezeigte Einheit (kWh oder MWh) auswählen — viele Geräte (z.B. Sensus PolluCom) zeigen den Verbrauch werksseitig in MWh an. Die App rechnet automatisch auf kWh um, damit die Nebenkostenabrechnung korrekt ist.</p>
       </div>
     </div>
   `;
 
   document.getElementById('btn-new-mieter').addEventListener('click', () => openMieterModal(wohnungId));
   document.getElementById('btn-new-zaehler').addEventListener('click', () => openZaehlerModal(wohnungId));
+}
+
+function einheitBadge(typ, einheit) {
+  const istWmz = typ === 'wmz_heizung' || typ === 'wmz_boiler';
+  if (istWmz && einheit === 'MWh') {
+    return `<span class="badge bg-purple-100 text-purple-700" title="Gerät zeigt Megawattstunden an">MWh</span>`;
+  }
+  if (istWmz) {
+    return `<span class="badge bg-slate-100 text-slate-600" title="Gerät zeigt Kilowattstunden an">kWh</span>`;
+  }
+  return escapeHtml(einheit);
 }
 
 function zaehlerTypLabel(typ) {
@@ -193,45 +210,111 @@ function openMieterModal(wohnungId, mieterId) {
   document.body.appendChild(modal);
 }
 
-function openZaehlerModal(wohnungId) {
+// Einheiten je Zählertyp - muss mit ERLAUBTE_EINHEITEN in src/routes/zaehler.ts übereinstimmen.
+// WMZ (Heizung/Boiler) kann kWh ODER MWh liefern, je nachdem was das physische Gerät anzeigt.
+const ZAEHLER_EINHEITEN = {
+  wmz_heizung: ['kWh', 'MWh'],
+  wmz_boiler: ['kWh', 'MWh'],
+  warmwasser: ['m³'],
+  kaltwasser: ['m³'],
+  sonstige: ['kWh', 'MWh', 'm³', 'Stk', 'sonstige'],
+};
+
+function openZaehlerModal(wohnungId, zaehlerId) {
   const modal = document.createElement('div');
   modal.className = 'fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4';
-  modal.innerHTML = `
-    <div class="bg-white rounded-xl p-6 w-full max-w-md">
-      <h2 class="text-lg font-bold mb-4">Neuer Zähler</h2>
-      <form id="zaehler-form" class="space-y-3">
-        <div><label class="text-xs font-semibold text-slate-500">Typ *</label>
-          <select class="form-input" name="typ" required>
-            <option value="wmz_heizung">WMZ Heizung</option>
-            <option value="warmwasser">Warmwasser</option>
-            <option value="kaltwasser">Kaltwasser</option>
-            <option value="sonstige">Sonstige</option>
-          </select>
-        </div>
-        <div><label class="text-xs font-semibold text-slate-500">Bezeichnung *</label><input class="form-input" name="bezeichnung" required value="Wärmemengenzähler"></div>
-        <div><label class="text-xs font-semibold text-slate-500">Ebene (optional, z.B. für DG mit 2 Zählern)</label><input class="form-input" name="ebene"></div>
-        <div><label class="text-xs font-semibold text-slate-500">Einheit *</label><input class="form-input" name="einheit" required value="kWh"></div>
-        <div class="flex justify-end gap-2 mt-4">
-          <button type="button" class="px-4 py-2 rounded-lg text-slate-600 bg-slate-100" onclick="this.closest('.fixed').remove()">Abbrechen</button>
-          <button type="submit" class="px-4 py-2 rounded-lg text-white bg-blue-700 font-semibold">Speichern</button>
-        </div>
-      </form>
-    </div>
-  `;
-  modal.querySelector('#zaehler-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    data.objekt_id = AppState.currentObjektId;
-    data.wohnung_id = wohnungId;
-    try {
-      await API.createZaehler(data);
-      toast('Zähler angelegt', 'success');
-      modal.remove();
-      loadWohnungDetail(wohnungId);
-    } catch (err) {
-      toast(err.message, 'error');
+
+  const renderEinheitOptions = (typ, aktuelleEinheit) => {
+    const optionen = ZAEHLER_EINHEITEN[typ] || ZAEHLER_EINHEITEN.sonstige;
+    return optionen.map((o) => `<option value="${o}" ${o === aktuelleEinheit ? 'selected' : ''}>${o}</option>`).join('');
+  };
+
+  const render = (z) => {
+    const istWmz = z.typ === 'wmz_heizung' || z.typ === 'wmz_boiler';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl p-6 w-full max-w-md">
+        <h2 class="text-lg font-bold mb-4">${zaehlerId ? 'Zähler bearbeiten' : 'Neuer Zähler'}</h2>
+        <form id="zaehler-form" class="space-y-3">
+          <div><label class="text-xs font-semibold text-slate-500">Typ *</label>
+            <select class="form-input" name="typ" required>
+              <option value="wmz_heizung" ${z.typ === 'wmz_heizung' ? 'selected' : ''}>WMZ Heizung</option>
+              <option value="warmwasser" ${z.typ === 'warmwasser' ? 'selected' : ''}>Warmwasser</option>
+              <option value="kaltwasser" ${z.typ === 'kaltwasser' ? 'selected' : ''}>Kaltwasser</option>
+              <option value="sonstige" ${z.typ === 'sonstige' ? 'selected' : ''}>Sonstige</option>
+            </select>
+          </div>
+          <div><label class="text-xs font-semibold text-slate-500">Bezeichnung *</label><input class="form-input" name="bezeichnung" required value="${escapeHtml(z.bezeichnung || 'Wärmemengenzähler')}"></div>
+          <div><label class="text-xs font-semibold text-slate-500">Ebene (optional, z.B. für DG mit 2 Zählern)</label><input class="form-input" name="ebene" value="${escapeHtml(z.ebene || '')}"></div>
+          <div>
+            <label class="text-xs font-semibold text-slate-500">Ableseeinheit * <span class="text-slate-400 font-normal">(am Gerät ablesbare Anzeige-Einheit)</span></label>
+            <select class="form-input" name="einheit" id="zaehler-einheit-select" required>
+              ${renderEinheitOptions(z.typ || 'wmz_heizung', z.einheit)}
+            </select>
+            <p id="zaehler-einheit-hinweis" class="text-xs mt-1 ${istWmz ? '' : 'hidden'}"><i class="fas fa-triangle-exclamation text-amber-500 mr-1"></i><span class="text-amber-600">Wichtig:</span> Viele WMZ-Geräte (z.B. Sensus PolluCom) zeigen den Verbrauch werksseitig in <b>MWh</b> an — bitte die tatsächlich am Display angezeigte Einheit wählen, sonst wird die Nebenkostenabrechnung falsch berechnet (Faktor 1000). Siehe WMZ-Ablesehilfe unter „Dokumente".</p>
+          </div>
+          <div><label class="text-xs font-semibold text-slate-500">Seriennummer</label><input class="form-input" name="seriennummer" value="${escapeHtml(z.seriennummer || '')}"></div>
+          <div class="flex justify-between items-center mt-4">
+            ${zaehlerId ? `<button type="button" id="btn-delete-zaehler" class="px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 text-sm font-medium"><i class="fas fa-trash mr-1"></i> Löschen</button>` : '<span></span>'}
+            <div class="flex gap-2">
+              <button type="button" class="px-4 py-2 rounded-lg text-slate-600 bg-slate-100" onclick="this.closest('.fixed').remove()">Abbrechen</button>
+              <button type="submit" class="px-4 py-2 rounded-lg text-white bg-blue-700 font-semibold">Speichern</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const typSelect = modal.querySelector('select[name="typ"]');
+    const einheitSelect = modal.querySelector('#zaehler-einheit-select');
+    const hinweis = modal.querySelector('#zaehler-einheit-hinweis');
+    typSelect.addEventListener('change', () => {
+      const neuerTyp = typSelect.value;
+      einheitSelect.innerHTML = renderEinheitOptions(neuerTyp, null);
+      const istWmzNeu = neuerTyp === 'wmz_heizung' || neuerTyp === 'wmz_boiler';
+      hinweis.classList.toggle('hidden', !istWmzNeu);
+    });
+
+    modal.querySelector('#zaehler-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      data.objekt_id = AppState.currentObjektId;
+      data.wohnung_id = wohnungId;
+      try {
+        if (zaehlerId) {
+          await API.updateZaehler(zaehlerId, data);
+          toast('Zähler aktualisiert', 'success');
+        } else {
+          await API.createZaehler(data);
+          toast('Zähler angelegt', 'success');
+        }
+        modal.remove();
+        loadWohnungDetail(wohnungId);
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    const delBtn = modal.querySelector('#btn-delete-zaehler');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm('Diesen Zähler wirklich löschen? Alle erfassten Zählerstände gehen dabei verloren.')) return;
+        try {
+          await API.deleteZaehler(zaehlerId);
+          toast('Zähler gelöscht', 'success');
+          modal.remove();
+          loadWohnungDetail(wohnungId);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
     }
-  });
+  };
+
+  if (zaehlerId) {
+    API.getZaehler(zaehlerId).then((z) => render(z)).catch((err) => { toast(err.message, 'error'); modal.remove(); });
+  } else {
+    render({ typ: 'wmz_heizung', einheit: 'kWh' });
+  }
   document.body.appendChild(modal);
 }
 

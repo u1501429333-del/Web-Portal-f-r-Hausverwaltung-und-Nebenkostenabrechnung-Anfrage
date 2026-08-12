@@ -1,8 +1,36 @@
 import { Hono } from 'hono'
 import type { AppContext } from '../lib/types'
 import { requireAdmin } from './auth'
+import { normalizeWaermeeinheitZuKwh } from '../lib/calc'
 
 export const zaehlerRoutes = new Hono<AppContext>()
+
+// Erlaubte Einheiten je Zählertyp. WMZ (Heizung/Boiler) kann kWh oder MWh liefern (viele Geräte,
+// z.B. Sensus PolluCom E/F, zeigen werksseitig MWh an) - die Auswahl entscheidet, wie der
+// Verbrauch in der Berechnung (calc.ts: normalizeWaermeeinheitZuKwh) auf kWh normalisiert wird.
+// Wasserzähler liefern immer m³.
+const ERLAUBTE_EINHEITEN: Record<string, string[]> = {
+  wmz_heizung: ['kWh', 'MWh'],
+  wmz_boiler: ['kWh', 'MWh'],
+  warmwasser: ['m³'],
+  kaltwasser: ['m³'],
+  sonstige: ['kWh', 'MWh', 'm³', 'Stk', 'sonstige'],
+}
+
+function validiereEinheit(typ: string, einheit: string): string {
+  const erlaubt = ERLAUBTE_EINHEITEN[typ] || ERLAUBTE_EINHEITEN.sonstige
+  if (erlaubt.includes(einheit)) return einheit
+  // Fallback: erste erlaubte Einheit für den Typ (z.B. 'kWh' für WMZ, 'm³' für Wasser)
+  return erlaubt[0]
+}
+
+// Einzelner Zähler (für Bearbeiten-Dialog)
+zaehlerRoutes.get('/:id', async (c) => {
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare('SELECT * FROM zaehler WHERE id = ?').bind(id).first()
+  if (!row) return c.json({ error: 'Zähler nicht gefunden' }, 404)
+  return c.json(row)
+})
 
 // Alle Zähler eines Objekts (inkl. Gebäude-Zähler ohne Wohnung, z.B. Boiler)
 zaehlerRoutes.get('/objekt/:objektId', async (c) => {
@@ -15,10 +43,11 @@ zaehlerRoutes.get('/objekt/:objektId', async (c) => {
 
 zaehlerRoutes.post('/', requireAdmin, async (c) => {
   const b = await c.req.json<any>()
+  const einheit = validiereEinheit(b.typ, b.einheit || 'kWh')
   const res = await c.env.DB.prepare(
     'INSERT INTO zaehler (objekt_id, wohnung_id, typ, ebene, bezeichnung, einheit, seriennummer, sort_order) VALUES (?,?,?,?,?,?,?,?)'
   )
-    .bind(b.objekt_id, b.wohnung_id ?? null, b.typ, b.ebene || '', b.bezeichnung || '', b.einheit || 'kWh', b.seriennummer || '', b.sort_order || 0)
+    .bind(b.objekt_id, b.wohnung_id ?? null, b.typ, b.ebene || '', b.bezeichnung || '', einheit, b.seriennummer || '', b.sort_order || 0)
     .run()
   return c.json({ id: res.meta.last_row_id })
 })
@@ -26,8 +55,9 @@ zaehlerRoutes.post('/', requireAdmin, async (c) => {
 zaehlerRoutes.put('/:id', requireAdmin, async (c) => {
   const id = c.req.param('id')
   const b = await c.req.json<any>()
+  const einheit = validiereEinheit(b.typ, b.einheit || 'kWh')
   await c.env.DB.prepare('UPDATE zaehler SET typ=?, ebene=?, bezeichnung=?, einheit=?, seriennummer=?, sort_order=? WHERE id=?')
-    .bind(b.typ, b.ebene || '', b.bezeichnung || '', b.einheit || 'kWh', b.seriennummer || '', b.sort_order || 0, id)
+    .bind(b.typ, b.ebene || '', b.bezeichnung || '', einheit, b.seriennummer || '', b.sort_order || 0, id)
     .run()
   return c.json({ ok: true })
 })
@@ -118,11 +148,18 @@ zaehlerRoutes.get('/objekt/:objektId/jahr/:jahr/csv', requireAdmin, async (c) =>
     sonstige: 'Sonstige',
   }
 
-  const zeilen = ['Wohnung;Zaehlertyp;Bezeichnung;Seriennummer;Einheit;Stand_Vorjahr;Stand_' + jahr + ';Verbrauch;Ablesedatum']
+  const zeilen = ['Wohnung;Zaehlertyp;Bezeichnung;Seriennummer;Einheit;Stand_Vorjahr;Stand_' + jahr + ';Verbrauch;Verbrauch_kWh_normalisiert;Ablesedatum']
   for (const z of zaehlerRows.results as any[]) {
     const aktuell = await c.env.DB.prepare('SELECT stand, ablesedatum FROM zaehlerstaende WHERE zaehler_id=? AND jahr=?').bind(z.id, jahr).first<any>()
     const vorjahr = await c.env.DB.prepare('SELECT stand FROM zaehlerstaende WHERE zaehler_id=? AND jahr=?').bind(z.id, jahr - 1).first<any>()
     const verbrauch = aktuell && vorjahr ? Math.max(0, aktuell.stand - vorjahr.stand) : ''
+    // Zusatzspalte: bei WMZ (Heizung/Boiler) auf kWh normalisiert, damit im CSV-Export für den
+    // Steuerberater unmissverständlich klar ist, welcher Verbrauch tatsächlich in die Abrechnung
+    // einfließt (die App rechnet intern immer in kWh, unabhängig von der Ableseeinheit am Gerät).
+    const verbrauchNormalisiert =
+      verbrauch !== '' && (z.typ === 'wmz_heizung' || z.typ === 'wmz_boiler')
+        ? normalizeWaermeeinheitZuKwh(verbrauch as number, z.einheit)
+        : verbrauch
     const wohnungLabel = z.wohnung_bezeichnung || 'Gebäude'
     zeilen.push(
       [
@@ -134,6 +171,7 @@ zaehlerRoutes.get('/objekt/:objektId/jahr/:jahr/csv', requireAdmin, async (c) =>
         vorjahr?.stand ?? '',
         aktuell?.stand ?? '',
         verbrauch,
+        verbrauchNormalisiert,
         aktuell?.ablesedatum ?? '',
       ]
         .map((v) => String(v).replace(/;/g, ','))
