@@ -74,24 +74,27 @@
   gesperrt) inkl. der echten Navigationsschritte (roten Knopf 5 Sek. halten →
   Ebene wählen → 2 Sek. halten zum Öffnen → Werte durchblättern) sowie einer
   Warnung zur MWh/kWh-Anzeige.
-- **Mietspiegel-Modul (Overath, PLZ 51491)**: Neue Datenbanktabellen
-  `mietspiegel_ausgaben` / `mietspiegel_werte` und API (`/api/mietspiegel/*`) mit der
-  vollständigen amtlichen Nettokaltmieten-Tabelle (96 Wertkombinationen aus
-  Baualtersklasse × Größenklasse × Ausstattung × Wohnlage) des **Mietspiegels für
-  frei finanzierte Wohnungen in Bergisch Gladbach, Stand 01.01.2026** (Haus und
-  Grund Rhein-Berg e.V.). Overath besitzt keinen eigenen Mietspiegel, ist aber laut
-  amtlicher Erläuterung Nr. 6 **uneingeschränkt eingeschlossen** (ebenso Odenthal und
-  Rösrath; Kürten mit 10 %-Abschlag) – rechtlich ein **einfacher Mietspiegel nach
-  §558c BGB**. `GET /api/mietspiegel/einordnung?baujahr=&groesse_m2=` liefert die
-  passende Nettokaltmieten-Spanne (€/m²) zur Einordnung einer Wohnung.
-  **Wichtiger Hinweis zur 2025-Ausgabe**: Die Vorgänger-Ausgabe (Stand 2024, welche
-  während 2025 gültig war) ist beim Herausgeber kostenpflichtig (3,50 €) und nicht
-  frei als PDF verfügbar; ihre genauen Tabellenwerte konnten daher nicht in die
-  Datenbank übernommen werden. Aktuell ist ausschließlich die **Ausgabe 2026**
-  hinterlegt (`ist_aktuell = 1`), die ab 01.01.2026 rechtlich maßgeblich ist. Die
-  Datenstruktur (`mietspiegel_ausgaben`) ist bewusst mehrjahresfähig angelegt, sodass
-  die 2024/2025-Ausgabe jederzeit nachträglich per Migration ergänzt werden kann,
-  sobald sie beschafft wurde.
+- **Mietspiegel-Modul (Overath, PLZ 51491) – ZWEI Ausgaben hinterlegt**: Neue
+  Datenbanktabellen `mietspiegel_ausgaben` / `mietspiegel_werte` und API
+  (`/api/mietspiegel/*`) mit der vollständigen amtlichen Nettokaltmieten-Tabelle
+  (jeweils 96 Wertkombinationen aus Baualtersklasse × Größenklasse × Ausstattung ×
+  Wohnlage) des **Mietspiegels für frei finanzierte Wohnungen in Bergisch Gladbach**:
+  - **Ausgabe Stand 01.01.2026** (aktuell gültig, `ist_aktuell = 1`)
+  - **Ausgabe Stand 01.01.2024** (war während des gesamten Jahres **2025** gültig)
+  Overath besitzt keinen eigenen Mietspiegel, ist aber laut amtlicher Erläuterung
+  Nr. 6 in **beiden** Ausgaben wortgleich **uneingeschränkt eingeschlossen** (ebenso
+  Odenthal und Rösrath; Kürten mit 10 %-Abschlag) – rechtlich ein **einfacher
+  Mietspiegel nach §558c BGB**. Die 2024er-Ausgabe wurde entgegen der ursprünglichen
+  Annahme **nicht** beim kostenpflichtigen Haus-und-Grund-Shop, sondern **kostenlos
+  direkt bei der Stadt Bergisch Gladbach** (amtliches Dokumenten-Center,
+  `bergischgladbach.de`) bezogen – damit ist auch die "2025er-Datenlücke" aus einer
+  früheren Version dieses Projekts vollständig geschlossen.
+  - `GET /api/mietspiegel/jahr/:jahr` liefert automatisch die für das jeweilige
+    Abrechnungsjahr gültige Ausgabe (z. B. `jahr=2025` → Ausgabe Stand 2024,
+    `jahr=2026` → Ausgabe Stand 2026).
+  - `GET /api/mietspiegel/einordnung?baujahr=&groesse_m2=&jahr=` liefert die passende
+    Nettokaltmieten-Spanne (€/m²) zur Einordnung einer Wohnung für ein bestimmtes Jahr
+    (ohne `jahr`-Parameter wird die aktuell gültige Ausgabe verwendet).
 - **Automatische Mietspiegel-Update-Prüfung (realistische Umsetzung)**: Da Cloudflare
   Workers keine eigenständigen Hintergrundprozesse/Web-Scraper zur Laufzeit ausführen
   können, wurde bewusst **kein** simuliertes "automatisches Herunterladen" umgesetzt.
@@ -133,7 +136,7 @@
 | Unterlagen | `GET/POST/DELETE /unterlagen/*` (Ordner: allgemein/steuerberater/zaehlerfotos) | Admin+Mieter (eigene) |
 | Dokumente | `GET /dokumente/wmz-ablesehilfe/html`, `GET /dokumente/ablesedatenblatt/:wohnungId/:jahr` | Admin+Mieter (eigene Wohnung) |
 | Objekte/Wohnungen | `POST /objekte` (erzeugt automatisch 17 BetrKV-Kostenarten), `POST /objekte/:id/wohnungen` (erzeugt automatisch 3 Standardzähler) | Admin |
-| Mietspiegel | `GET /mietspiegel/aktuell`, `GET /mietspiegel/ausgaben`, `GET /mietspiegel/einordnung?baujahr=&groesse_m2=` (Overath/Bergisch Gladbach, Stand 2026) | Admin |
+| Mietspiegel | `GET /mietspiegel/aktuell`, `GET /mietspiegel/jahr/:jahr`, `GET /mietspiegel/ausgaben`, `GET /mietspiegel/einordnung?baujahr=&groesse_m2=&jahr=` (Overath/Bergisch Gladbach, Ausgaben 2024 & 2026) | Admin |
 
 ## Benutzerhandbuch (Kurzfassung)
 1. **Admin-Login** mit den Zugangsdaten aus der Demo-Migration (siehe unten) oder
@@ -165,8 +168,6 @@
 - Mietspiegel-Admin-UI (Frontend-Ansicht der Tabelle + Wohnungs-Einordnung im
   Browser) – Backend/API und Datenbank sind vollständig fertig, die Anzeige im
   Admin-Bereich fehlt noch.
-- Mietspiegel-Ausgabe 2024/2025 (kostenpflichtig beim Herausgeber, nicht frei
-  verfügbar) – aktuell ist nur die Ausgabe 2026 hinterlegt (siehe Hinweis oben).
 - UI-Dialog zum Ändern des eigenen Passworts (aktuell nur per DB/Admin-Reset möglich).
 - Echter (serverseitiger) E-Mail-Versand von Dokumenten/CSV-Exporten (aktuell nur
   `mailto:`-Link bzw. HTML-Ansicht/Druck – kein SMTP/API-Versand).
