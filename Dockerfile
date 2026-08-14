@@ -9,8 +9,18 @@
 # inkl. lokal emulierter D1-SQLite-Datenbank. Das ist funktional
 # gleichwertig (identischer Code, identische Berechnungen/Dokumente),
 # aber kein "echtes" Cloudflare-Deployment.
+#
+# WICHTIG – Node.js-Version:
+# wrangler (>=4.x) bricht zur LAUFZEIT hart ab (exit code 1), wenn
+# process.versions.node < 22.0.0 ist (siehe node_modules/wrangler/bin/wrangler.js,
+# MIN_NODE_VERSION = "22.0.0"). Das Base-Image MUSS daher mindestens
+# node:22-* sein – mit node:20-* baut das Image zwar erfolgreich durch
+# (der Build-Schritt selbst ruft wrangler nicht auf), aber der Container
+# stirbt sofort beim Start ("Wrangler requires at least Node.js v22.0.0."),
+# was durch "restart: unless-stopped" wie eine Endlosschleife/"App startet
+# nicht" aussieht.
 # ============================================================
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 # WICHTIG: NODE_ENV=production darf hier NOCH NICHT gesetzt werden!
 # npm respektiert NODE_ENV beim Installieren: ist es bereits "production",

@@ -196,7 +196,9 @@
 - **Status**: ✅ Aktiv (lokale Sandbox-Instanz läuft), Docker-Self-Hosting-Setup
   bereitgestellt (`Dockerfile`, `docker-compose.yml`, `scripts/install.sh`,
   `scripts/update.sh`, `scripts/backup.sh`) – siehe [`INSTALL.md`](./INSTALL.md).
-- **Letzte Aktualisierung**: 2026-08-12
+- **Letzte Aktualisierung**: 2026-08-14 (Docker-Fix: Base-Image auf Node 22
+  angehoben – wrangler >=4.x bricht auf Node 20 zur Laufzeit ab, siehe
+  [`INSTALL.md`](./INSTALL.md#fehlerbehebung-troubleshooting))
 
 ## Entwicklung (lokal / Sandbox)
 ```bash

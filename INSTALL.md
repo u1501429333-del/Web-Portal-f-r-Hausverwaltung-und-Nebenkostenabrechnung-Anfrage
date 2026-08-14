@@ -121,7 +121,7 @@ Das Skript zeigt am Ende die erreichbare URL und die Standard-Zugangsdaten an.
 1. Prüft Architektur, RAM, Speicherplatz, CPU-Kerne (siehe Schritt 0) und gibt Warnungen aus, bricht aber nicht ab.
 2. Prüft ob Docker + `docker compose` Plugin vorhanden sind, installiert Docker nur falls nötig.
 3. Klont `https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git` nach `/opt/hausverwaltung` (falls noch nicht vorhanden).
-4. Führt `docker compose build` aus (baut das Image – Node 20, installiert Abhängigkeiten, führt `npm run build` aus).
+4. Führt `docker compose build` aus (baut das Image – Node 22, installiert Abhängigkeiten, führt `npm run build` aus).
 5. Führt `docker compose up -d` aus (startet den Container im Hintergrund, `restart: unless-stopped`).
 6. Beim Container-Start wendet der Entrypoint automatisch alle Datenbank-Migrationen an (`docker/entrypoint.sh`) – beim allerersten Start wird die komplette Datenbank inkl. Demo-Daten angelegt, bei späteren Starts nur neue Migrationen.
 
@@ -247,6 +247,7 @@ Legt eine `.tar.gz`-Sicherung unter `backups/` an (Inhalt des Datenbank-Volumes)
 | `docker compose up -d` startet, aber `curl localhost:3000` antwortet nicht | `docker compose logs -f hausverwaltung` prüfen – meist Migration-Fehler beim ersten Start; Container einmal `docker compose restart hausverwaltung`. |
 | Daten nach Update/Neustart weg | Volume-Mount in `docker-compose.yml` prüfen (`hausverwaltung_data:/app/.wrangler/state`) – niemals `docker compose down -v` verwenden (das `-v` löscht Volumes!). Nur `docker compose down` (ohne `-v`) bzw. `docker compose restart`. |
 | `permission denied` bei `docker`-Befehlen (frisch installiert) | Einmal ab- und wieder anmelden, damit die Gruppenmitgliedschaft `docker` aktiv wird, oder `sudo` vor die Befehle stellen. |
+| Container startet und stoppt sofort wieder (Endlos-Neustart durch `restart: unless-stopped`); in `docker compose logs -f hausverwaltung` steht `Wrangler requires at least Node.js v22.0.0. You are using v20...` | **Ursache war ein veraltetes Docker-Image (Node 20) – seit dem Update auf Node 22 im `Dockerfile` behoben.** Falls der Fehler nach einem `git pull` weiterhin auftritt: mit `bash scripts/update.sh` (bzw. `docker compose build --no-cache && docker compose up -d`) das Image komplett neu bauen, damit die neue `Dockerfile`-Zeile `FROM node:22-bookworm-slim` greift. |
 
 ---
 
