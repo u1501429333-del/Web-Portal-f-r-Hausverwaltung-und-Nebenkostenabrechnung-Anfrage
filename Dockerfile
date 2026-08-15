@@ -4,38 +4,41 @@
 #
 # Wichtiger Hinweis zur Architektur:
 # Diese App ist für Cloudflare Pages/Workers entwickelt (Hono + D1).
-# Für Self-Hosting läuft sie hier NICHT über echtes Cloudflare, sondern
-# über "wrangler pages dev" (Miniflare) als lokaler Node.js-Prozess –
-# inkl. lokal emulierter D1-SQLite-Datenbank. Das ist funktional
-# gleichwertig (identischer Code, identische Berechnungen/Dokumente),
-# aber kein "echtes" Cloudflare-Deployment.
+# "npm run build" (vite build) erzeugt weiterhin den normalen
+# Cloudflare-Worker (dist/_worker.js) – daran ändert sich nichts.
 #
-# WICHTIG – Node.js-Version:
-# wrangler (>=4.x) bricht zur LAUFZEIT hart ab (exit code 1), wenn
-# process.versions.node < 22.0.0 ist (siehe node_modules/wrangler/bin/wrangler.js,
-# MIN_NODE_VERSION = "22.0.0"). Das Base-Image MUSS daher mindestens
-# node:22-* sein – mit node:20-* baut das Image zwar erfolgreich durch
-# (der Build-Schritt selbst ruft wrangler nicht auf), aber der Container
-# stirbt sofort beim Start ("Wrangler requires at least Node.js v22.0.0."),
-# was durch "restart: unless-stopped" wie eine Endlosschleife/"App startet
-# nicht" aussieht.
+# ZUR LAUFZEIT wird dieser Worker hier aber NICHT über "wrangler pages dev"
+# (workerd) ausgeführt, sondern über einen schlanken, selbst geschriebenen
+# node:http-Server (server/node-server.mjs), der den Worker per fetch()
+# aufruft und env.DB durch eine node:sqlite-basierte D1-kompatible Schicht
+# ersetzt (server/d1-shim.mjs). Funktional gleichwertig (identischer
+# Anwendungscode, identische Berechnungen/Dokumente), aber kein "echtes"
+# Cloudflare-Deployment.
+#
+# WARUM nicht "wrangler pages dev"?
+# Cloudflares workerd-Runtime hat einen seit 2023 offenen, ungelösten
+# TCMalloc-Speicherzuweisungsfehler, der auf JEDEM aarch64-Gerät mit
+# 39-Bit-Kernel-Adressraum sofort abstürzt ("MmapAligned() failed" /
+# "write EPIPE") – das betrifft praktisch alle Armbian-Images für
+# TV-Boxen/SBCs (Amlogic, Rockchip, Raspberry Pi OS u.a.), unabhängig
+# von der Node.js-Version. Siehe:
+#   https://github.com/cloudflare/workerd/issues/5013
+#   https://github.com/cloudflare/workerd/issues/5020
+#   https://github.com/cloudflare/workers-sdk/issues/10878
+# Der native Node-Server umgeht workerd komplett und läuft daher auch
+# auf diesen Geräten stabil. "wrangler"/"vite" bleiben nur als
+# Build-Zeit-Werkzeuge (devDependencies) im Einsatz.
 # ============================================================
 FROM node:22-bookworm-slim
 
-# WICHTIG: NODE_ENV=production darf hier NOCH NICHT gesetzt werden!
-# npm respektiert NODE_ENV beim Installieren: ist es bereits "production",
-# überspringt "npm ci" alle devDependencies (vite, wrangler, @hono/vite-build) –
-# der Build-Schritt schlägt dann mit "sh: vite: not found" fehl. Außerdem wird
-# "wrangler" (ebenfalls eine devDependency) zur LAUFZEIT im Entrypoint benötigt
-# (wrangler pages dev), darf also auch danach nicht entfernt werden.
 ENV CI=true \
-    WRANGLER_SEND_METRICS=false \
     PORT=3000
 
 WORKDIR /app
 
 # 1) Abhängigkeiten getrennt cachen (schnellere Rebuilds bei Code-Änderungen)
-#    --include=dev erzwingt die devDependencies-Installation unabhängig von NODE_ENV.
+#    --include=dev erzwingt die devDependencies-Installation (vite, wrangler-
+#    Typen etc. werden nur für den Build-Schritt gebraucht).
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund --include=dev
 
@@ -46,14 +49,13 @@ RUN npm run build
 # 3) Entrypoint ausführbar machen
 RUN chmod +x docker/entrypoint.sh
 
-# Erst NACH dem Build auf "production" setzen (nur für den Laufzeit-Prozess selbst
-# relevant, z.B. Fehlermeldungen/Performance von Hono – node_modules bleiben vollständig).
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-# .wrangler/state enthält die lokale D1-SQLite-Datenbank (inkl. Logo/Branding,
-# alle Objekte/Wohnungen/Mieter/Kosten/Dokumente) – MUSS als Volume persistiert werden!
-VOLUME ["/app/.wrangler/state"]
+# /app/data enthält die SQLite-Datenbank (node:sqlite, D1-kompatibel via
+# server/d1-shim.mjs) – inkl. Logo/Branding, alle Objekte/Wohnungen/
+# Mieter/Kosten/Dokumente – MUSS als Volume persistiert werden!
+VOLUME ["/app/data"]
 
 ENTRYPOINT ["docker/entrypoint.sh"]

@@ -22,8 +22,9 @@ services:
       # (homeassistant/portainer laufen üblicherweise auf anderen Ports).
       - "3000:3000"
     volumes:
-      # Persistiert die komplette Datenbank (D1-SQLite: Objekte, Wohnungen,
-      # Mieter, Zählerstände, Kosten, Dokumente, Logo/Branding, Logins).
+      # Persistiert die komplette Datenbank (node:sqlite, D1-kompatibel via
+      # server/d1-shim.mjs: Objekte, Wohnungen, Mieter, Zählerstände, Kosten,
+      # Dokumente, Logo/Branding, Logins).
       # OHNE dieses Volume gehen bei jedem Container-Neustart alle Daten verloren!
       # WICHTIG: Der Volume-Name "hausverwaltung_data" wird bewusst NICHT auf
       # "uhv_data" umbenannt, obwohl die App jetzt "UHV-Web-Portal" heißt –
@@ -31,7 +32,12 @@ services:
       # anlegen und alle bereits erfassten Objekte/Wohnungen/Mieter/
       # Zählerstände/Kosten bestehender Installationen wären scheinbar
       # verschwunden (das alte Volume bliebe zwar erhalten, aber unverknüpft).
-      - hausverwaltung_data:/app/.wrangler/state
+      # HINWEIS: Der interne Mount-Pfad wurde von "/app/.wrangler/state" auf
+      # "/app/data" geändert (Umstieg von "wrangler pages dev" auf den
+      # nativen Node-Server, siehe Dockerfile). Bei einem Update von einer
+      # Installation vor diesem Fix bitte einmalig die alte Datenbankdatei
+      # aus dem Volume kopieren, siehe INSTALL.md "Fehlerbehebung".
+      - hausverwaltung_data:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3000

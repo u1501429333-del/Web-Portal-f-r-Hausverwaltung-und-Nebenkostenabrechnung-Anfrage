@@ -123,7 +123,7 @@ Das Skript zeigt am Ende die erreichbare URL und die Standard-Zugangsdaten an.
 3. Klont `https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git` nach `/opt/hausverwaltung` (falls noch nicht vorhanden).
 4. Führt `docker compose build` aus (baut das Image – Node 22, installiert Abhängigkeiten, führt `npm run build` aus).
 5. Führt `docker compose up -d` aus (startet den Container im Hintergrund, `restart: unless-stopped`).
-6. Beim Container-Start wendet der Entrypoint automatisch alle Datenbank-Migrationen an (`docker/entrypoint.sh`) – beim allerersten Start wird die komplette Datenbank inkl. Demo-Daten angelegt, bei späteren Starts nur neue Migrationen.
+6. Beim Container-Start startet der Entrypoint (`docker/entrypoint.sh`) einen **eigenen, nativen Node.js-HTTP-Server** (`server/node-server.mjs`), der automatisch alle Datenbank-Migrationen anwendet – beim allerersten Start wird die komplette Datenbank inkl. Demo-Daten angelegt, bei späteren Starts nur neue Migrationen. (Warum kein `wrangler pages dev` mehr läuft, siehe Anhang B.)
 
 ---
 
@@ -167,11 +167,23 @@ docker compose logs -f hausverwaltung   # Strg+C zum Beenden der Log-Ansicht
 
 Erwartete Ausgabe in den Logs (nach ca. 5–15 Sekunden):
 ```
-[entrypoint] Wende D1-Migrationen an ...
-[entrypoint] Starte UHV-Web-Portal v3 auf Port 3000 ...
-⎔ Starting local server...
-[wrangler] Ready on http://0.0.0.0:3000
+[server] Oeffne Datenbank: /app/data/hausverwaltung.sqlite3
+[server] Wende Migration an: 0001_initial.sql
+[server] Wende Migration an: 0002_...
+[server] Wende Migration an: 0007_mietspiegel_2024.sql
+[server] 7 neue Migration(en) angewendet.
+[server] Lade Worker-Modul dist/_worker.js ...
+[server] UHV-Web-Portal v3 laeuft auf http://0.0.0.0:3000
 ```
+
+> Bei späteren Neustarts (Datenbank existiert bereits) fällt die Zeile
+> `N neue Migration(en) angewendet.` entsprechend kürzer aus bzw. zeigt `0 neue Migration(en)`.
+>
+> **Hinweis:** Diese Ausgabe ersetzt seit der Umstellung auf den nativen Node-Server
+> die früher hier dokumentierte `wrangler`/`⎔ Starting local server...`-Ausgabe. Wenn du
+> stattdessen noch `[entrypoint] Wende D1-Migrationen an (lokal, persistiert unter
+> /app/.wrangler/state) ...` gefolgt von TCMalloc-/`MmapAligned()`-Fehlern siehst, läuft
+> noch ein altes Image – siehe Fehlerbehebung unten ("TCMalloc / MmapAligned() failed").
 
 ### 4.5 Alternative: Verwaltung über Portainer (statt CLI)
 
@@ -245,9 +257,11 @@ Legt eine `.tar.gz`-Sicherung unter `backups/` an (Inhalt des Datenbank-Volumes)
 | `docker compose build` bricht mit "Killed" ab | Zu wenig RAM während des Builds. Swapfile anlegen (Anhang A) oder auf leistungsstärkerem Rechner bauen und Image exportieren/importieren (`docker save` / `docker load`). |
 | Port 3000 schon belegt | In `docker-compose.yml` den Host-Port ändern, siehe Schritt 1. |
 | `docker compose up -d` startet, aber `curl localhost:3000` antwortet nicht | `docker compose logs -f hausverwaltung` prüfen – meist Migration-Fehler beim ersten Start; Container einmal `docker compose restart hausverwaltung`. |
-| Daten nach Update/Neustart weg | Volume-Mount in `docker-compose.yml` prüfen (`hausverwaltung_data:/app/.wrangler/state`) – niemals `docker compose down -v` verwenden (das `-v` löscht Volumes!). Nur `docker compose down` (ohne `-v`) bzw. `docker compose restart`. |
+| Daten nach Update/Neustart weg | Volume-Mount in `docker-compose.yml` prüfen (`hausverwaltung_data:/app/data`) – niemals `docker compose down -v` verwenden (das `-v` löscht Volumes!). Nur `docker compose down` (ohne `-v`) bzw. `docker compose restart`. |
 | `permission denied` bei `docker`-Befehlen (frisch installiert) | Einmal ab- und wieder anmelden, damit die Gruppenmitgliedschaft `docker` aktiv wird, oder `sudo` vor die Befehle stellen. |
-| Container startet und stoppt sofort wieder (Endlos-Neustart durch `restart: unless-stopped`); in `docker compose logs -f hausverwaltung` steht `Wrangler requires at least Node.js v22.0.0. You are using v20...` | **Ursache war ein veraltetes Docker-Image (Node 20) – seit dem Update auf Node 22 im `Dockerfile` behoben.** Falls der Fehler nach einem `git pull` weiterhin auftritt: mit `bash scripts/update.sh` (bzw. `docker compose build --no-cache && docker compose up -d`) das Image komplett neu bauen, damit die neue `Dockerfile`-Zeile `FROM node:22-bookworm-slim` greift. |
+| Container startet und stoppt sofort wieder (Endlos-Neustart durch `restart: unless-stopped`); in `docker compose logs -f hausverwaltung` steht `Wrangler requires at least Node.js v22.0.0. You are using v20...` | **Ursache war ein veraltetes Docker-Image (Node 20) – seit dem Update auf Node 22 im `Dockerfile` behoben.** Mit `bash scripts/update.sh` (bzw. `docker compose build --no-cache && docker compose up -d`) das Image komplett neu bauen. Falls der Container danach immer noch mit `wrangler`-bezogenen Fehlern abstürzt, siehe nächste Zeile – ab dieser Version läuft zur Laufzeit gar kein `wrangler` mehr, dieser Fehler kann also nicht mehr auftreten. |
+| Container-Log zeigt `external/tcmalloc.../MmapAligned() failed`, `CHECK in Alloc: FATAL ERROR: Out of memory`, `✘ [ERROR] write EPIPE` und Endlos-Neustart | **Bekannter, von Cloudflare bisher ungelöster Bug in `workerd`** (dem internen Laufzeit-Kern von `wrangler pages dev`): Auf praktisch jedem ARM64-Gerät mit 39-Bit-Kernel-Adressraum (Standard bei Armbian/TV-Boxen, auch Raspberry Pi OS) stürzt `workerd`s TCMalloc-Speicherallokator beim Start ab (siehe `cloudflare/workerd#5013`, `#5020`, `cloudflare/workers-sdk#10878`). **Das ist unabhängig von der Node-Version** und nicht durch Konfiguration behebbar. **Lösung ab dieser Version:** Die App läuft zur Laufzeit nicht mehr über `wrangler pages dev`, sondern über einen eigenen nativen `node:http`-Server (`server/node-server.mjs`) mit `node:sqlite` statt Miniflare-D1 – `workerd` wird beim Self-Hosting dadurch komplett umgangen. Mit `git pull` + `docker compose build --no-cache && docker compose up -d` (bzw. `bash scripts/update.sh`) auf die neue Version aktualisieren. Falls du bereits eine ältere Version mit echten Daten unter `/app/.wrangler/state` laufen hattest: siehe Hinweis "Umzug von altem Datenpfad" direkt unten. |
+| Umzug von altem Datenpfad (`/app/.wrangler/state`) auf neuen Datenpfad (`/app/data`) | Ab dieser Version speichert die App ihre SQLite-Datenbank unter `/app/data` statt `/app/.wrangler/state` (das alte, Miniflare-spezifische Verzeichnis existiert mit dem neuen nativen Server gar nicht mehr). Da die App vorher wegen des TCMalloc-Bugs auf ARM64-TV-Boxen ohnehin nie stabil durchgestartet ist, dürfte in der Praxis kein Datenverlust entstehen. Falls du dennoch schon echte Daten auf einem anderen (z. B. x86_64-)Rechner gesammelt hast: Container stoppen (`docker compose down`, ohne `-v`), altes Volume mounten und die Datei darin suchen (`docker run --rm -v hausverwaltung_data:/old alpine find /old -name '*.sqlite3*'`), falls vorhanden nach `/app/data/hausverwaltung.sqlite3` im (neuen) `hausverwaltung_data`-Volume kopieren, dann `docker compose up -d` erneut ausführen. |
 
 ---
 
@@ -271,8 +285,45 @@ Danach `docker compose build` erneut ausführen.
 ## Anhang B: Technischer Hintergrund (kurz)
 
 Die App ist ursprünglich für **Cloudflare Pages/Workers** (Hono-Framework, D1-Datenbank)
-entwickelt. Für das Self-Hosting auf deiner TV-Box läuft sie **nicht** über echtes
-Cloudflare, sondern über `wrangler pages dev` (Miniflare) als lokalen Node.js-Prozess
-inkl. lokal emulierter D1-SQLite-Datenbank – **funktional identisch** (gleicher Code,
-gleiche Berechnungen, gleiche Dokumente), aber eben lokal statt in der Cloudflare-Cloud.
-Das ist im `Dockerfile` als Kommentar dokumentiert.
+entwickelt. `npm run build` (Vite) erzeugt daraus unverändert ein Standard-Cloudflare-
+Worker-Modul (`dist/_worker.js`), das nur Web-APIs verwendet (`Request`/`Response`/
+`fetch`) – dieser Build-Schritt und der komplette Anwendungscode (`src/`) sind von den
+folgenden Änderungen **nicht** betroffen.
+
+Für das Self-Hosting auf deiner TV-Box wurde die Laufzeitumgebung jedoch umgestellt:
+
+**Ursprünglicher Ansatz (bis einschließlich Commit `5f48e53`):** Die App lief über
+`wrangler pages dev` (intern basierend auf Cloudflares `workerd`-Laufzeit) als lokalen
+Node.js-Prozess inkl. lokal emulierter D1-SQLite-Datenbank. Das funktionierte auf x86_64-
+Rechnern einwandfrei, stürzte aber auf ARM64-Geräten mit 39-Bit-Kernel-Adressraum
+(Standard-Konfiguration bei Armbian, den meisten TV-Box-Images und Raspberry Pi OS)
+regelmäßig mit einem TCMalloc-Speicherfehler (`MmapAligned() failed`, `CHECK in Alloc:
+FATAL ERROR: Out of memory`, `write EPIPE`) beim Start ab. Es handelt sich um einen
+bei Cloudflare seit 2023 bekannten, bis heute (2026) ungelösten Bug in `workerd` selbst
+(siehe GitHub-Issues `cloudflare/workerd#5013`, `#5020`, `cloudflare/workers-sdk#10878`,
+`#3457`) – die einzigen dort genannten Workarounds sind entweder ein neu kompilierter
+Kernel mit `CONFIG_ARM64_VA_BITS_48=y` (für normale Nutzer nicht praktikabel) oder eine
+Korrektur seitens Cloudflare, die bislang nicht erfolgt ist. **Dieses Problem ist
+unabhängig von der Node.js-Version** – der vorherige Fix (Node 20 → 22) war notwendig
+(wrangler selbst benötigt Node ≥ 22), aber allein nicht ausreichend.
+
+**Aktueller Ansatz (ab dieser Version):** Zur Laufzeit im Docker-Container läuft
+`workerd`/`wrangler pages dev` gar nicht mehr. Stattdessen startet `docker/entrypoint.sh`
+einen eigenen, schlanken `node:http`-Server (`server/node-server.mjs`), der das
+unveränderte `dist/_worker.js`-Modul direkt lädt und dessen `fetch(request, env, ctx)`-
+Handler pro eingehendem HTTP-Request aufruft (Konvertierung zwischen `http.IncomingMessage`
+und den Web-Standard-Objekten `Request`/`Response`/`Headers` erfolgt in diesem Server).
+Als Ersatz für die Cloudflare-D1-Datenbank kommt `server/d1-shim.mjs` zum Einsatz: eine
+dünne Kompatibilitätsschicht auf Basis von Node's eingebautem `node:sqlite`-Modul
+(`--experimental-sqlite`), die dieselbe API (`prepare()`, `bind()`, `first()`, `all()`,
+`run()`, passende `meta`-Rückgabewerte) bereitstellt wie `env.DB` unter echtem Cloudflare
+D1. `node:sqlite` wurde bewusst gewählt, weil es **ohne native Kompilierung** auskommt –
+wichtig auf ARM64-TV-Boxen ohne vollständige Build-Toolchain, anders als z. B.
+`better-sqlite3`. Die SQLite-Datei liegt unter `/app/data/hausverwaltung.sqlite3`
+(Docker-Volume `hausverwaltung_data`), die Migrationen aus `migrations/*.sql` werden vom
+nativen Server selbst und automatisch angewendet. Ergebnis: **funktional identischer**
+Anwendungscode, gleiche Berechnungen, gleiche Dokumente – nur ohne `workerd` als
+Laufzeitumgebung und damit ohne den ARM64-TCMalloc-Absturz. Für Entwicklung auf x86_64
+(z. B. in der Genspark-Sandbox) bleibt weiterhin `wrangler pages dev` im Einsatz, da der
+Bug dort nicht auftritt – ausschließlich der Docker-Self-Hosting-Pfad (`docker/entrypoint.sh`)
+nutzt den nativen Server.

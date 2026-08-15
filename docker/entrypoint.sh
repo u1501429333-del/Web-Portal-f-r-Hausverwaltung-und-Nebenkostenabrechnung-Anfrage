@@ -1,19 +1,22 @@
 #!/bin/sh
 # ============================================================
-# Entrypoint: wendet beim Start automatisch alle noch offenen
-# D1-Migrationen an (idempotent) und startet dann den Server.
-# So funktionieren "docker compose up" beim allerersten Start
-# (Datenbank leer, alle Migrationen + Seed werden angewendet)
-# und spätere Updates (nur neue Migrationsdateien werden
-# ausgeführt, bestehende Daten bleiben erhalten) ohne manuelle
-# Schritte.
+# Entrypoint: startet den nativen Node.js-Server (server/node-server.mjs).
+#
+# Frueher wurde hier "wrangler pages dev" (workerd) gestartet. Das wurde
+# entfernt, weil workerd auf ARM64-Geraeten mit 39-Bit-Kernel-Adressraum
+# (Standard bei Armbian/TV-Boxen, Raspberry Pi OS u.a.) mit einem seit
+# 2023 offenen, ungeloesten TCMalloc-Bug abstuerzt - unabhaengig von der
+# Node.js-Version (siehe Kommentar im Dockerfile fuer Details/Links).
+#
+# server/node-server.mjs wendet beim Start automatisch alle noch offenen
+# Migrationen aus migrations/*.sql auf die node:sqlite-Datenbank unter
+# /app/data an (idempotent, per _migrations-Tabelle nachverfolgt) und
+# startet danach den HTTP-Server. So funktionieren "docker compose up"
+# beim allerersten Start (Datenbank leer, alle Migrationen + Seed werden
+# angewendet) und spaetere Updates (nur neue Migrationsdateien werden
+# ausgefuehrt, bestehende Daten bleiben erhalten) ohne manuelle Schritte.
 # ============================================================
 set -e
 
-echo "[entrypoint] Wende D1-Migrationen an (lokal, persistiert unter /app/.wrangler/state) ..."
-npx wrangler d1 migrations apply webapp-production --local || {
-  echo "[entrypoint] WARNUNG: Migration fehlgeschlagen oder nichts zu tun – fahre trotzdem fort."
-}
-
-echo "[entrypoint] Starte UHV-Web-Portal v3 auf Port ${PORT:-3000} ..."
-exec npx wrangler pages dev dist --d1=webapp-production --local --ip 0.0.0.0 --port "${PORT:-3000}"
+echo "[entrypoint] Starte UHV-Web-Portal v3 (nativer Node-Server) auf Port ${PORT:-3000} ..."
+exec node --experimental-sqlite server/node-server.mjs
