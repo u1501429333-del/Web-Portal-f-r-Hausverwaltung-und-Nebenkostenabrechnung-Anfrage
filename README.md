@@ -196,14 +196,17 @@
 - **Status**: ✅ Aktiv (lokale Sandbox-Instanz läuft), Docker-Self-Hosting-Setup
   bereitgestellt (`Dockerfile`, `docker-compose.yml`, `scripts/install.sh`,
   `scripts/update.sh`, `scripts/backup.sh`) – siehe [`INSTALL.md`](./INSTALL.md).
-- **Letzte Aktualisierung**: 2026-08-15 (Docker-Self-Hosting: `workerd`/`wrangler pages dev`
+- **Letzte Aktualisierung**: 2026-08-16 (1. Docker-Self-Hosting: `workerd`/`wrangler pages dev`
   zur Laufzeit durch einen eigenen nativen `node:http`-Server (`server/node-server.mjs`) mit
   `node:sqlite`-D1-Kompatibilitätsschicht (`server/d1-shim.mjs`) ersetzt – behebt einen
   bekannten, bei Cloudflare ungelösten `workerd`-TCMalloc-Absturz auf ARM64-Geräten mit
   39-Bit-Kernel-Adressraum (Standard bei Armbian/TV-Boxen); Datenpfad im Docker-Volume
-  geändert von `/app/.wrangler/state` auf `/app/data`. Der Anwendungscode (`src/`) und
-  `npm run build` sind unverändert. Siehe
-  [`INSTALL.md`](./INSTALL.md#fehlerbehebung-troubleshooting) und Anhang B dort für Details.)
+  geändert von `/app/.wrangler/state` auf `/app/data`.
+  2. Login-Fix: Session-Cookie (`src/routes/auth.ts`) hatte fest `secure: true` gesetzt,
+  wodurch Browser es bei reinem HTTP-Self-Hosting (z. B. `http://<lan-ip>:3000` ohne eigenes
+  TLS) stillschweigend verwarfen – jeder Login führte danach sofort zu "Keine Berechtigung".
+  Wird jetzt automatisch anhand des tatsächlichen Verbindungsprotokolls gesetzt.
+  Siehe [`INSTALL.md`](./INSTALL.md#fehlerbehebung-troubleshooting) für Details.)
 
 ## Entwicklung (lokal / Sandbox)
 ```bash

@@ -12,6 +12,25 @@ function getSecret(c: any): string {
   return c.env.SESSION_SECRET || 'dev-insecure-secret-change-me'
 }
 
+// Das "Secure"-Cookie-Attribut sagt dem Browser: "Nur ueber HTTPS senden".
+// Auf Cloudflare Pages ist die eingehende Verbindung immer HTTPS, daher dort
+// secure=true. Beim Self-Hosting (z.B. Docker auf einer TV-Box) laeuft die
+// App aber typischerweise ohne eigenes TLS-Zertifikat einfach ueber
+// http://<lan-ip>:3000 - mit secure=true wuerde der Browser das Cookie dann
+// STILLSCHWEIGEND verwerfen, wodurch jeder Login sofort wieder als "nicht
+// angemeldet" erscheint (Fehler "Keine Berechtigung"). Wir erkennen das
+// tatsaechliche Protokoll daher automatisch aus der Request-URL bzw. dem von
+// Reverse-Proxies gesetzten "X-Forwarded-Proto"-Header.
+function isSecureRequest(c: any): boolean {
+  const forwardedProto = c.req.header('x-forwarded-proto')
+  if (forwardedProto) return forwardedProto.split(',')[0].trim().toLowerCase() === 'https'
+  try {
+    return new URL(c.req.url).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 authRoutes.post('/login', async (c) => {
   const body = await c.req.json<{ email?: string; password?: string }>().catch(() => ({}))
   const email = (body.email || '').trim().toLowerCase()
@@ -37,7 +56,7 @@ authRoutes.post('/login', async (c) => {
 
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: true,
+    secure: isSecureRequest(c),
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_TTL_SECONDS,
