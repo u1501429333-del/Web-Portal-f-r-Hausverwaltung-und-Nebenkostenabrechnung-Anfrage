@@ -206,7 +206,27 @@
   wodurch Browser es bei reinem HTTP-Self-Hosting (z. B. `http://<lan-ip>:3000` ohne eigenes
   TLS) stillschweigend verwarfen – jeder Login führte danach sofort zu "Keine Berechtigung".
   Wird jetzt automatisch anhand des tatsächlichen Verbindungsprotokolls gesetzt.
-  Siehe [`INSTALL.md`](./INSTALL.md#fehlerbehebung-troubleshooting) für Details.)
+  Siehe [`INSTALL.md`](./INSTALL.md#fehlerbehebung-troubleshooting) für Details.
+  3. UI/UX-Überarbeitung (Screenshots-Feedback): `admin/schaeden`-Absturz durch
+  SQL-Zitat-Bug behoben (`node:sqlite` erlaubt anders als D1/Miniflare keine
+  doppelten Anführungszeichen für String-Literale); neuer Selbstbedienungs-Dialog
+  "Mein Konto" (E-Mail/Passwort ändern) für Admin **und** Mieter über die Sidebar;
+  neue zentrale Übersichtsseite "Mieter-Zugänge" (`/admin/mieter-zugaenge`), die
+  objektübergreifend zeigt, welche Mieter bereits einen Portal-Login haben und
+  erlaubt, Zugänge direkt anzulegen/zurückzusetzen (vorher nur versteckt in der
+  Wohnungs-Detailansicht auffindbar).
+  4. Vollständiges Seiten-Audit (alle `admin_*.js`-Seiten + komplettes
+  Mieter-Portal) auf "stille" JavaScript-Fehler geprüft: `admin_dokumente.js`
+  referenzierte für die Treppenreinigungsplan-Generierung ein nicht mehr
+  existierendes Formularfeld (`reinigungsplan-jahr`) – Button schlug bei jedem
+  Klick fehl, jetzt behoben (nutzt den globalen Jahres-Filter der Kopfzeile).
+  5. Dashboard und Seiten-Layout kompakter/professioneller gestaltet: KPI-Kacheln
+  in einer schlanken Zeile statt zwei Reihen, Mietende-Warnungen als schmale
+  Hinweiszeile statt große Box, kleinere Diagramme, Wohnungstabelle mit
+  Scroll-Begrenzung und fixiertem Tabellenkopf; Sidebar/Header verschlankt;
+  gesamtes Layout nutzt jetzt feste Bildschirmhöhe mit eigenständig scrollendem
+  Inhaltsbereich, damit Seiten wie bei einer professionellen
+  Hausverwaltungs-Software auf den Bildschirm passen, auch bei vielen Wohnungen.)
 
 ## Entwicklung (lokal / Sandbox)
 ```bash
