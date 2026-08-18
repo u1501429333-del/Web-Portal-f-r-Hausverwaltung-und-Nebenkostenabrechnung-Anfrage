@@ -97,6 +97,35 @@ objekteRoutes.delete('/:id', requireAdmin, async (c) => {
   return c.json({ ok: true })
 })
 
+// -------- Mieter-Zugänge: alle Mieter eines Objekts inkl. Login-Status (für zentrale Übersicht) --------
+objekteRoutes.get('/:id/mieter-zugaenge', requireAdmin, async (c) => {
+  const objektId = c.req.param('id')
+  const rows = await c.env.DB.prepare(
+    `SELECT m.id, m.anrede, m.vorname, m.nachname, m.email, m.aktiv,
+            w.id as wohnung_id, w.bezeichnung as wohnung_bezeichnung,
+            u.id as user_id, u.email as login_email, u.active as login_active
+     FROM mieter m
+     JOIN wohnungen w ON w.id = m.wohnung_id
+     LEFT JOIN users u ON u.mieter_id = m.id
+     WHERE w.objekt_id = ?
+     ORDER BY m.aktiv DESC, w.sort_order, w.id, m.id`
+  )
+    .bind(objektId)
+    .all<any>()
+  const result = rows.results.map((r: any) => ({
+    id: r.id,
+    name: `${r.anrede || ''} ${r.vorname || ''} ${r.nachname}`.trim(),
+    email: r.email,
+    aktiv: !!r.aktiv,
+    wohnung_id: r.wohnung_id,
+    wohnung_bezeichnung: r.wohnung_bezeichnung,
+    has_login: !!r.user_id,
+    login_email: r.login_email,
+    login_active: r.user_id ? !!r.login_active : null,
+  }))
+  return c.json(result)
+})
+
 // -------- Wohnungen --------
 objekteRoutes.get('/:id/wohnungen', async (c) => {
   const id = c.req.param('id')

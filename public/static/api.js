@@ -19,6 +19,7 @@ const API = {
   login: (email, password) => api.post('/auth/login', { email, password }).then((r) => r.data),
   logout: () => api.post('/auth/logout').then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),
+  updateMyAccount: (data) => api.put('/auth/me', data).then((r) => r.data),
 
   // Objekte
   listObjekte: () => api.get('/objekte').then((r) => r.data),
@@ -45,6 +46,7 @@ const API = {
   getMieterLoginStatus: (id) => api.get(`/mieter/${id}/login-status`).then((r) => r.data),
   createMieterLogin: (id, data) => api.post(`/mieter/${id}/create-login`, data).then((r) => r.data),
   resetMieterPassword: (id, data) => api.post(`/mieter/${id}/reset-password`, data || {}).then((r) => r.data),
+  listMieterZugaenge: (objektId) => api.get(`/objekte/${objektId}/mieter-zugaenge`).then((r) => r.data),
 
   // Zähler
   listZaehlerByObjekt: (objektId) => api.get(`/zaehler/objekt/${objektId}`).then((r) => r.data),

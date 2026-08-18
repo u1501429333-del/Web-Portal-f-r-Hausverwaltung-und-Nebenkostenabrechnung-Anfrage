@@ -18,7 +18,7 @@ schaedenRoutes.get('/objekt/:objektId', requireAdmin, async (c) => {
     query += ' AND s.status = ?'
     binds.push(status)
   }
-  query += ' ORDER BY CASE s.prioritaet WHEN "hoch" THEN 0 WHEN "mittel" THEN 1 ELSE 2 END, s.erstellt_am DESC'
+  query += " ORDER BY CASE s.prioritaet WHEN 'hoch' THEN 0 WHEN 'mittel' THEN 1 ELSE 2 END, s.erstellt_am DESC"
   const rows = await c.env.DB.prepare(query).bind(...binds).all()
   return c.json(rows.results)
 })

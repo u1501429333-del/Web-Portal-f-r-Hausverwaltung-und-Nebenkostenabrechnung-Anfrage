@@ -6,6 +6,7 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
   const navItemsAdmin = [
     { key: 'dashboard', href: '#/admin', icon: 'fa-gauge-high', label: 'Dashboard' },
     { key: 'objekte', href: '#/admin/objekte', icon: 'fa-building', label: 'Objekte & Wohnungen' },
+    { key: 'mieter-zugaenge', href: '#/admin/mieter-zugaenge', icon: 'fa-key', label: 'Mieter-Zugänge' },
     { key: 'zaehler', href: '#/admin/zaehler', icon: 'fa-gauge', label: 'Zählerstände' },
     { key: 'kosten', href: '#/admin/kosten', icon: 'fa-file-invoice-dollar', label: 'Kosten erfassen' },
     { key: 'abrechnung', href: '#/admin/abrechnung', icon: 'fa-calculator', label: 'Abrechnung' },
@@ -52,8 +53,14 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
             .join('')}
         </nav>
         <div class="p-3 border-t border-slate-700">
-          <div class="px-3 py-2 text-xs text-slate-400">Angemeldet als</div>
-          <div class="px-3 pb-2 text-sm font-medium text-white truncate">${escapeHtml(AppState.user?.name || AppState.user?.email || '')}</div>
+          <button onclick="openMeinKontoModal()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700/60 transition group" title="Mein Konto (E-Mail / Passwort ändern)">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              Angemeldet als
+              <i class="fas fa-user-gear text-slate-500 group-hover:text-white transition"></i>
+            </div>
+            <div class="text-sm font-medium text-white truncate">${escapeHtml(AppState.user?.name || AppState.user?.email || '')}</div>
+            <div class="text-xs text-slate-400 truncate">${escapeHtml(AppState.user?.email || '')}</div>
+          </button>
           ${isAdmin && AppState.pinRequired ? `<button onclick="lockPinGate()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700/60 transition">
             <i class="fas fa-lock"></i> Admin-Bereich sperren
           </button>` : ''}
@@ -105,4 +112,60 @@ async function ensureObjekteLoaded() {
       AppState.currentObjektId = AppState.objekte[0].id;
     }
   }
+}
+
+// ============================================================
+// "Mein Konto": eigene E-Mail-Adresse und/oder eigenes Passwort ändern.
+// Für Admin UND Mieter über die Sidebar erreichbar.
+// ============================================================
+function openMeinKontoModal() {
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl p-6 w-full max-w-md">
+      <h2 class="text-lg font-bold mb-1"><i class="fas fa-user-gear text-blue-600 mr-1"></i> Mein Konto</h2>
+      <p class="text-sm text-slate-500 mb-4">E-Mail-Adresse und/oder Passwort für den eigenen Zugang ändern.</p>
+      <form id="mein-konto-form" class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-slate-500">E-Mail-Adresse</label>
+          <input class="form-input" type="email" name="email" value="${escapeHtml(AppState.user?.email || '')}" required>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-500">Neues Passwort (leer lassen = unverändert)</label>
+          <input class="form-input" type="password" name="new_password" autocomplete="new-password" placeholder="Mind. 6 Zeichen">
+        </div>
+        <div class="pt-2 border-t border-slate-100">
+          <label class="text-xs font-semibold text-slate-500">Aktuelles Passwort <span class="text-red-500">*</span> (zur Bestätigung erforderlich)</label>
+          <input class="form-input" type="password" name="current_password" autocomplete="current-password" required placeholder="Zur Sicherheit erneut eingeben">
+        </div>
+        <div id="mein-konto-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2"></div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="px-4 py-2 rounded-lg text-slate-600 bg-slate-100" onclick="this.closest('.fixed').remove()">Abbrechen</button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-white bg-blue-600 font-semibold"><i class="fas fa-save mr-1"></i>Speichern</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#mein-konto-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const errorBox = modal.querySelector('#mein-konto-error');
+    errorBox.classList.add('hidden');
+    try {
+      const res = await API.updateMyAccount({
+        email: fd.email,
+        new_password: fd.new_password || undefined,
+        current_password: fd.current_password,
+      });
+      AppState.user = res.user;
+      toast('Konto aktualisiert', 'success');
+      modal.remove();
+      router();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.remove('hidden');
+    }
+  });
 }

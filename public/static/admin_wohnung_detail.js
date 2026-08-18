@@ -46,12 +46,16 @@ async function loadWohnungDetail(wohnungId) {
                   <p class="text-xs text-slate-500">Mietbeginn: ${fmtDate(m.mietbeginn)} ${m.mietende ? '· Ende: ' + fmtDate(m.mietende) : ''}</p>
                   <p class="text-xs text-slate-500">Kaltmiete: ${fmtEuro(m.kaltmiete_monat)}/Monat · NK-Vorauszahlung: ${fmtEuro(m.vorauszahlung_nk_monat)}/Monat</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex items-center gap-2">
                   <button class="text-slate-400 hover:text-blue-600" title="Bearbeiten" onclick="openMieterModal(${wohnungId}, ${m.id})"><i class="fas fa-pen"></i></button>
-                  <button class="text-slate-400 hover:text-emerald-600" title="Login-Zugang / Mieter einladen" onclick="openMieterLoginModal(${m.id})"><i class="fas fa-key"></i></button>
                   <button class="text-slate-400 hover:text-purple-600" title="Mietvertrag erzeugen" onclick="genMietvertrag(${m.id})"><i class="fas fa-file-contract"></i></button>
                   <button class="text-slate-400 hover:text-amber-600" title="Wohnungsübergabe erzeugen" onclick="genWohnungsuebergabe(${m.id})"><i class="fas fa-house-circle-check"></i></button>
                 </div>
+              </div>
+              <div class="mt-2 pt-2 border-t border-slate-200/70">
+                <button class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition" onclick="openMieterLoginModal(${m.id}, () => loadWohnungDetail(${wohnungId}))">
+                  <i class="fas fa-key"></i> Login-Zugang verwalten
+                </button>
               </div>
             </div>
           `).join('') || `<p class="text-slate-400 text-sm text-center py-4">Kein Mieter erfasst.</p>`}
@@ -345,7 +349,7 @@ async function genWohnungsuebergabe(mieterId) {
 // ============================================================
 // Mieter-Login-Zugang: Einladen / Zugang erstellen / Passwort zurücksetzen
 // ============================================================
-function openMieterLoginModal(mieterId) {
+function openMieterLoginModal(mieterId, onDone) {
   const modal = document.createElement('div');
   modal.className = 'fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4';
   modal.innerHTML = `<div class="bg-white rounded-xl p-6 w-full max-w-md"><div class="flex items-center justify-center py-10"><div class="spinner"></div></div></div>`;
@@ -402,6 +406,7 @@ function openMieterLoginModal(mieterId) {
           <p class="text-xs text-slate-500 mt-1">Bitte diese Zugangsdaten sicher an den Mieter weitergeben (werden nicht automatisch per E-Mail versendet).</p>
         `;
         toast(action === 'create' ? 'Login-Zugang erstellt' : 'Passwort zurückgesetzt', 'success');
+        if (onDone) onDone();
       } catch (err) {
         toast(err.message, 'error');
       }

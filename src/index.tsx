@@ -66,6 +66,7 @@ const indexHtml = `<!DOCTYPE html>
   <script src="/static/admin_dashboard.js"></script>
   <script src="/static/admin_objekte.js"></script>
   <script src="/static/admin_wohnung_detail.js"></script>
+  <script src="/static/admin_mieter_zugaenge.js"></script>
   <script src="/static/admin_zaehler.js"></script>
   <script src="/static/admin_kosten.js"></script>
   <script src="/static/admin_abrechnung.js"></script>

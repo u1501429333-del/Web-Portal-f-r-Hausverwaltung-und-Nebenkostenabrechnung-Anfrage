@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie'
 import type { AppContext } from '../lib/types'
-import { verifyPassword, createSessionToken, verifySessionToken } from '../lib/auth'
+import { verifyPassword, createSessionToken, verifySessionToken, generateSalt, hashPassword } from '../lib/auth'
 
 export const authRoutes = new Hono<AppContext>()
 
@@ -85,6 +85,74 @@ authRoutes.get('/me', async (c) => {
   if (!user) return c.json({ user: null })
 
   return c.json({ user: { id: user.id, email: user.email, role: user.role, name: user.name, mieterId: user.mieter_id } })
+})
+
+// ============================================================
+// "Mein Konto": jeder eingeloggte Nutzer (Admin ODER Mieter) darf seine
+// eigene E-Mail-Adresse und/oder sein eigenes Passwort ändern.
+// ============================================================
+authRoutes.put('/me', async (c) => {
+  const token = getCookie(c, SESSION_COOKIE)
+  if (!token) return c.json({ error: 'Nicht angemeldet' }, 401)
+  const session = await verifySessionToken(token, getSecret(c))
+  if (!session) return c.json({ error: 'Nicht angemeldet' }, 401)
+
+  const b = await c.req.json<any>().catch(() => ({}))
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ? AND active = 1')
+    .bind(session.uid)
+    .first<any>()
+  if (!user) return c.json({ error: 'Benutzer nicht gefunden' }, 404)
+
+  // Aktuelles Passwort ist zur Bestätigung IMMER erforderlich (Sicherheit:
+  // verhindert Kontoübernahme über eine gestohlene/vergessene Session).
+  const currentPassword = b.current_password || ''
+  const ok = await verifyPassword(currentPassword, user.salt, user.password_hash)
+  if (!ok) return c.json({ error: 'Aktuelles Passwort ist falsch' }, 401)
+
+  const updates: string[] = []
+  const binds: any[] = []
+
+  if (b.email) {
+    const newEmail = String(b.email).trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      return c.json({ error: 'Ungültige E-Mail-Adresse' }, 400)
+    }
+    if (newEmail !== user.email) {
+      const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?')
+        .bind(newEmail, user.id)
+        .first<any>()
+      if (existing) return c.json({ error: 'Diese E-Mail-Adresse wird bereits verwendet' }, 400)
+      updates.push('email=?')
+      binds.push(newEmail)
+    }
+  }
+
+  if (b.new_password) {
+    const newPassword = String(b.new_password)
+    if (newPassword.length < 6) {
+      return c.json({ error: 'Neues Passwort muss mindestens 6 Zeichen lang sein' }, 400)
+    }
+    const salt = generateSalt()
+    const hash = await hashPassword(newPassword, salt)
+    updates.push('password_hash=?', 'salt=?')
+    binds.push(hash, salt)
+  }
+
+  if (updates.length === 0) {
+    return c.json({ error: 'Keine Änderungen angegeben' }, 400)
+  }
+
+  binds.push(user.id)
+  await c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id=?`).bind(...binds).run()
+
+  const updated = await c.env.DB.prepare('SELECT id, email, role, name, mieter_id FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<any>()
+
+  return c.json({
+    ok: true,
+    user: { id: updated.id, email: updated.email, role: updated.role, name: updated.name, mieterId: updated.mieter_id },
+  })
 })
 
 // Middleware: Session prüfen und in Context ablegen
