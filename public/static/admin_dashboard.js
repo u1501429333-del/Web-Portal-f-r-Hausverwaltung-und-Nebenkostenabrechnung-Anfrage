@@ -1,5 +1,5 @@
 // ============================================================
-// Admin: Dashboard
+// Admin: Dashboard (kompaktes, professionelles Layout)
 // ============================================================
 registerRoute('/admin', async (app) => {
   await ensureObjekteLoaded();
@@ -51,72 +51,92 @@ async function loadDashboard() {
     const nachzahl = erweitert?.nachzahlungen;
     const trend = erweitert?.kostentrend;
 
+    // -------- Kompakte KPI-Leiste (eine Reihe statt zwei) --------
+    const kpis = [
+      {
+        icon: 'fa-door-open', label: 'Wohnungen',
+        value: `${wohnungen.length}`,
+      },
+      {
+        icon: 'fa-ruler-combined', label: 'Gesamtfläche',
+        value: `${fmtNum(flaecheGesamt)} m²`,
+      },
+      {
+        icon: 'fa-euro-sign', label: `Nebenkosten ${jahr}`,
+        value: fmtEuro(gesamtkosten),
+        sub: diffPct !== null ? `<span class="${diffPct >= 0 ? 'text-red-600' : 'text-emerald-600'}"><i class="fas fa-arrow-${diffPct >= 0 ? 'up' : 'down'}"></i> ${Math.abs(diffPct).toFixed(1)}% vs. ${jahr - 1}</span>` : null,
+      },
+      {
+        icon: 'fa-check-double', label: 'Plausibilität',
+        value: verteilung ? '<span class="text-emerald-600">✓ OK</span>' : '<span class="text-amber-600">⚠ Keine Daten</span>',
+        small: true,
+      },
+      {
+        icon: 'fa-house-circle-xmark', label: 'Leerstand',
+        value: `${leerstand?.anzahl ?? 0} / ${leerstand?.von_wohnungen_gesamt ?? wohnungen.length}`,
+        sub: leerstand ? `${fmtPct((leerstand.quote_pct || 0) / 100)} der Fläche` : null,
+        warn: !!leerstand?.anzahl,
+      },
+      {
+        icon: 'fa-hand-holding-dollar', label: `Nachzahlungen ${jahr}`,
+        value: `<span class="text-red-600">${fmtEuro(nachzahl?.summe_nachzahlung || 0)}</span>`,
+        sub: `${nachzahl?.anzahl_nachzahlung ?? 0} Mieter · Guthaben ${fmtEuro(nachzahl?.summe_guthaben || 0)}`,
+        warn: !!nachzahl?.anzahl_nachzahlung,
+      },
+    ];
+
+    const kpiHtml = kpis.map((k) => `
+      <div class="card px-4 py-3 ${k.warn ? 'border-l-4 border-amber-500' : ''}">
+        <div class="text-slate-500 text-[0.7rem] uppercase tracking-wide mb-1 truncate"><i class="fas ${k.icon} mr-1"></i>${k.label}</div>
+        <div class="${k.small ? 'text-base' : 'text-xl'} font-bold text-slate-800 leading-tight">${k.value}</div>
+        ${k.sub ? `<div class="text-[0.72rem] text-slate-500 mt-0.5 truncate">${k.sub}</div>` : ''}
+      </div>
+    `).join('');
+
+    // -------- Schlanke Warnleiste für Mietende (nur wenn vorhanden) --------
+    const mietendeHtml = mietende.length ? `
+      <div class="card px-4 py-2.5 mb-4 border-l-4 border-amber-500 flex items-start gap-2 text-sm">
+        <i class="fas fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+        <div class="flex-1 min-w-0">
+          <span class="font-semibold text-amber-700">Mietende in Kürze:</span>
+          <span class="text-slate-600">
+            ${mietende.map((m) => `${escapeHtml(m.mieter_name)} (${escapeHtml(m.wohnung_bezeichnung)}, in ${m.tage_bis_mietende} Tg., ${fmtDate(m.mietende)})`).join(' · ')}
+          </span>
+        </div>
+      </div>
+    ` : '';
+
     container.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="card p-5">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-door-open mr-1"></i> Wohnungen</div>
-          <div class="text-2xl font-bold text-slate-800">${wohnungen.length}</div>
-        </div>
-        <div class="card p-5">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-ruler-combined mr-1"></i> Gesamtfläche</div>
-          <div class="text-2xl font-bold text-slate-800">${fmtNum(flaecheGesamt)} m²</div>
-        </div>
-        <div class="card p-5">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-euro-sign mr-1"></i> Nebenkosten ${jahr}</div>
-          <div class="text-2xl font-bold text-slate-800">${fmtEuro(gesamtkosten)}</div>
-          ${diffPct !== null ? `<div class="text-xs mt-1 ${diffPct >= 0 ? 'text-red-600' : 'text-emerald-600'}"><i class="fas fa-arrow-${diffPct >= 0 ? 'up' : 'down'}"></i> ${Math.abs(diffPct).toFixed(1)}% vs. ${jahr - 1}</div>` : ''}
-        </div>
-        <div class="card p-5">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-check-double mr-1"></i> Plausibilität</div>
-          <div class="text-lg font-bold ${verteilung ? 'text-emerald-600' : 'text-amber-600'}">${verteilung ? '✓ OK' : '⚠ Keine Daten'}</div>
-        </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
+        ${kpiHtml}
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="card p-5 ${leerstand?.anzahl ? 'border-l-4 border-amber-500' : ''}">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-house-circle-xmark mr-1"></i> Leerstand</div>
-          <div class="text-2xl font-bold ${leerstand?.anzahl ? 'text-amber-600' : 'text-slate-800'}">${leerstand?.anzahl ?? 0} / ${leerstand?.von_wohnungen_gesamt ?? wohnungen.length}</div>
-          <div class="text-xs text-slate-500 mt-1">${leerstand ? fmtPct((leerstand.quote_pct || 0) / 100) + ' der Fläche' : '—'}</div>
-        </div>
-        <div class="card p-5 ${nachzahl?.anzahl_nachzahlung ? 'border-l-4 border-red-500' : ''}">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-hand-holding-dollar mr-1"></i> Nachzahlungen ${jahr}</div>
-          <div class="text-2xl font-bold text-red-600">${fmtEuro(nachzahl?.summe_nachzahlung || 0)}</div>
-          <div class="text-xs text-slate-500 mt-1">${nachzahl?.anzahl_nachzahlung ?? 0} Mieter · Guthaben: ${fmtEuro(nachzahl?.summe_guthaben || 0)}</div>
-        </div>
-        <div class="card p-5 col-span-2">
-          <div class="text-slate-500 text-sm mb-1"><i class="fas fa-triangle-exclamation mr-1 text-amber-500"></i> Mietende-Warnungen (nächste 90 Tage)</div>
-          ${mietende.length ? `
-            <div class="max-h-24 overflow-y-auto text-sm space-y-1 mt-1">
-              ${mietende.map((m) => `<div><b>${escapeHtml(m.mieter_name)}</b> (${escapeHtml(m.wohnung_bezeichnung)}) — endet in ${m.tage_bis_mietende} Tag(en), ${fmtDate(m.mietende)}</div>`).join('')}
-            </div>
-          ` : `<div class="text-sm text-slate-400 mt-2">Keine anstehenden Mietenden.</div>`}
-        </div>
-      </div>
+      ${mietendeHtml}
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="card p-5">
-          <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-chart-pie text-blue-600 mr-1"></i> Kostenverteilung nach Art</h3>
-          <canvas id="chart-kostenarten" height="220"></canvas>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="card p-4">
+          <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fas fa-chart-pie text-blue-600 mr-1"></i> Kostenverteilung nach Art</h3>
+          <canvas id="chart-kostenarten" height="160"></canvas>
         </div>
-        <div class="card p-5">
-          <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-users text-blue-600 mr-1"></i> Nebenkosten pro Wohnung</h3>
-          <canvas id="chart-wohnungen" height="220"></canvas>
+        <div class="card p-4">
+          <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fas fa-users text-blue-600 mr-1"></i> Nebenkosten pro Wohnung</h3>
+          <canvas id="chart-wohnungen" height="160"></canvas>
         </div>
       </div>
 
       ${trend && trend.punkte && trend.punkte.length ? `
-      <div class="card p-5 mt-6">
-        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-chart-line text-blue-600 mr-1"></i> 3-Jahres-Kostentrend mit Regressionsprognose</h3>
-        <canvas id="chart-trend" height="180"></canvas>
+      <div class="card p-4 mt-4">
+        <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fas fa-chart-line text-blue-600 mr-1"></i> 3-Jahres-Kostentrend mit Regressionsprognose</h3>
+        <canvas id="chart-trend" height="120"></canvas>
         <p class="text-xs text-slate-500 mt-2">Lineare Regression: Änderung ca. ${fmtEuro(trend.steigung_pro_jahr)} pro Jahr. Prognose ${jahr + 1}: <b>${fmtEuro(trend.prognose_naechstes_jahr)}</b></p>
       </div>
       ` : ''}
 
-      <div class="card p-5 mt-6">
-        <h3 class="font-bold text-slate-700 mb-3"><i class="fas fa-list text-blue-600 mr-1"></i> Wohnungsübersicht ${jahr}</h3>
-        <div class="overflow-x-auto">
+      <div class="card p-4 mt-4">
+        <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fas fa-list text-blue-600 mr-1"></i> Wohnungsübersicht ${jahr}</h3>
+        <div class="overflow-auto max-h-[340px]">
           <table class="data-table w-full text-sm">
-            <thead><tr><th>Wohnung</th><th>Lage</th><th class="text-right">Fläche</th><th class="text-right">Nebenkosten</th><th></th></tr></thead>
+            <thead class="sticky top-0 z-10"><tr><th>Wohnung</th><th>Lage</th><th class="text-right">Fläche</th><th class="text-right">Nebenkosten</th><th></th></tr></thead>
             <tbody>
               ${wohnungen.map((w) => {
                 const summe = verteilung?.wohnungSummen?.[w.id] || 0;
@@ -144,7 +164,7 @@ async function loadDashboard() {
             backgroundColor: ['#2563eb','#0891b2','#16a34a','#ca8a04','#dc2626','#9333ea','#0d9488','#c026d3','#65a30d','#ea580c','#4f46e5','#0284c7','#be185d','#059669','#7c3aed','#d97706','#475569'],
           }],
         },
-        options: { plugins: { legend: { display: false } }, responsive: true },
+        options: { plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false },
       });
 
       new Chart(document.getElementById('chart-wohnungen'), {
@@ -153,7 +173,7 @@ async function loadDashboard() {
           labels: wohnungen.map((w) => w.bezeichnung),
           datasets: [{ label: 'Nebenkosten €', data: wohnungen.map((w) => verteilung.wohnungSummen?.[w.id] || 0), backgroundColor: '#2563eb' }],
         },
-        options: { plugins: { legend: { display: false } }, responsive: true },
+        options: { plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false },
       });
     }
 
@@ -170,7 +190,7 @@ async function loadDashboard() {
             { label: 'Regression / Prognose', data: regressionData, borderColor: '#dc2626', borderDash: [6, 4], pointRadius: 3, tension: 0 },
           ],
         },
-        options: { plugins: { legend: { position: 'bottom' } }, responsive: true },
+        options: { plugins: { legend: { position: 'bottom' } }, responsive: true, maintainAspectRatio: false },
       });
     }
   } catch (err) {

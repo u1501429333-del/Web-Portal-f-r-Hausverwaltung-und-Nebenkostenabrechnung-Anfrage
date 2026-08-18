@@ -32,49 +32,49 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
     : '';
 
   return `
-    <div class="min-h-screen flex">
-      <aside class="w-64 bg-slate-900 text-slate-200 flex flex-col no-print">
-        <div class="p-5 border-b border-slate-700">
+    <div class="h-screen flex overflow-hidden">
+      <aside class="w-60 bg-slate-900 text-slate-200 flex flex-col no-print shrink-0">
+        <div class="p-4 border-b border-slate-700 shrink-0">
           <div class="flex items-center gap-2">
             ${AppState.branding?.logo_data_url
-              ? `<img src="${AppState.branding.logo_data_url}" alt="Logo" class="h-8 max-w-[40px] object-contain rounded bg-white p-0.5" />`
-              : '<i class="fas fa-building-shield text-blue-400 text-xl"></i>'}
-            <span class="font-bold text-white text-lg truncate">${escapeHtml(AppState.branding?.app_name || 'UHV-Web-Portal')}</span>
+              ? `<img src="${AppState.branding.logo_data_url}" alt="Logo" class="h-7 max-w-[36px] object-contain rounded bg-white p-0.5" />`
+              : '<i class="fas fa-building-shield text-blue-400 text-lg"></i>'}
+            <span class="font-bold text-white text-base truncate">${escapeHtml(AppState.branding?.app_name || 'UHV-Web-Portal')}</span>
           </div>
-          <p class="text-xs text-slate-400 mt-1">${isAdmin ? 'Admin-Bereich' : 'Mieter-Portal'} <span class="text-slate-500">· v3</span></p>
+          <p class="text-[0.7rem] text-slate-400 mt-1">${isAdmin ? 'Admin-Bereich' : 'Mieter-Portal'} <span class="text-slate-500">· v3</span></p>
         </div>
-        <nav class="flex-1 p-3 space-y-1">
+        <nav class="flex-1 p-2.5 space-y-0.5 overflow-y-auto min-h-0">
           ${navItems
             .map(
-              (item) => `<a href="${item.href}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${activeKey === item.key ? 'active' : ''}">
-              <i class="fas ${item.icon} w-5 text-center"></i> ${item.label}
+              (item) => `<a href="${item.href}" class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-[0.83rem] font-medium transition ${activeKey === item.key ? 'active' : ''}">
+              <i class="fas ${item.icon} w-4 text-center text-xs"></i> ${item.label}
             </a>`
             )
             .join('')}
         </nav>
-        <div class="p-3 border-t border-slate-700">
-          <button onclick="openMeinKontoModal()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700/60 transition group" title="Mein Konto (E-Mail / Passwort ändern)">
-            <div class="text-xs text-slate-400 flex items-center justify-between">
+        <div class="p-2.5 border-t border-slate-700 shrink-0">
+          <button onclick="openMeinKontoModal()" class="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-700/60 transition group" title="Mein Konto (E-Mail / Passwort ändern)">
+            <div class="text-[0.68rem] text-slate-400 flex items-center justify-between">
               Angemeldet als
               <i class="fas fa-user-gear text-slate-500 group-hover:text-white transition"></i>
             </div>
-            <div class="text-sm font-medium text-white truncate">${escapeHtml(AppState.user?.name || AppState.user?.email || '')}</div>
-            <div class="text-xs text-slate-400 truncate">${escapeHtml(AppState.user?.email || '')}</div>
+            <div class="text-[0.83rem] font-medium text-white truncate">${escapeHtml(AppState.user?.name || AppState.user?.email || '')}</div>
+            <div class="text-[0.7rem] text-slate-400 truncate">${escapeHtml(AppState.user?.email || '')}</div>
           </button>
-          ${isAdmin && AppState.pinRequired ? `<button onclick="lockPinGate()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700/60 transition">
+          ${isAdmin && AppState.pinRequired ? `<button onclick="lockPinGate()" class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[0.8rem] text-slate-300 hover:bg-slate-700/60 transition">
             <i class="fas fa-lock"></i> Admin-Bereich sperren
           </button>` : ''}
-          <button onclick="doLogout()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-300 hover:bg-red-900/40 transition">
+          <button onclick="doLogout()" class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[0.8rem] text-red-300 hover:bg-red-900/40 transition">
             <i class="fas fa-right-from-bracket"></i> Abmelden
           </button>
         </div>
       </aside>
-      <main class="flex-1 flex flex-col min-h-screen">
-        <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between no-print">
-          <h1 class="text-lg font-bold text-slate-800">${opts.title || ''}</h1>
-          <div class="flex items-center gap-3">
+      <main class="flex-1 flex flex-col h-screen min-w-0">
+        <header class="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between no-print shrink-0">
+          <h1 class="text-base font-bold text-slate-800 truncate">${opts.title || ''}</h1>
+          <div class="flex items-center gap-2 shrink-0">
             ${objektSelector}
-            <select id="jahr-selector" class="form-input text-sm !py-1.5 w-28">
+            <select id="jahr-selector" class="form-input text-sm !py-1.5 w-24">
               ${[0, -1, -2, -3].map((d) => {
                 const j = new Date().getFullYear() + d;
                 return `<option value="${j}" ${j === AppState.currentJahr ? 'selected' : ''}>${j}</option>`;
@@ -82,7 +82,7 @@ function renderLayout(activeKey, contentHtml, opts = {}) {
             </select>
           </div>
         </header>
-        <div class="flex-1 p-6 bg-slate-50 overflow-y-auto">${contentHtml}</div>
+        <div class="flex-1 p-4 bg-slate-50 overflow-y-auto min-h-0">${contentHtml}</div>
       </main>
     </div>
   `;

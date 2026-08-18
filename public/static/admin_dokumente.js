@@ -77,7 +77,7 @@ async function loadDokumente() {
 
   document.getElementById('btn-gen-reinigungsplan').addEventListener('click', async () => {
     try {
-      const jahr = Number(document.getElementById('reinigungsplan-jahr').value);
+      const jahr = AppState.currentJahr;
       const res = await API.generateReinigungsplan(objektId, jahr);
       window.open(API.dokumentHtmlUrl(res.id), '_blank');
       toast('Reinigungsplan erstellt', 'success');
