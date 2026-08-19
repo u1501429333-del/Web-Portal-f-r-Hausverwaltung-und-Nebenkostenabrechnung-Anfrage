@@ -226,7 +226,18 @@
   Scroll-Begrenzung und fixiertem Tabellenkopf; Sidebar/Header verschlankt;
   gesamtes Layout nutzt jetzt feste Bildschirmhöhe mit eigenständig scrollendem
   Inhaltsbereich, damit Seiten wie bei einer professionellen
-  Hausverwaltungs-Software auf den Bildschirm passen, auch bei vielen Wohnungen.)
+  Hausverwaltungs-Software auf den Bildschirm passen, auch bei vielen Wohnungen.
+  6. **KRITISCHER Layout-Bug behoben**: Auf allen Seiten (Dashboard, Zählerstände,
+  Kosten erfassen, Abrechnung, Dokumente, Schadensmeldungen, Unterlagen,
+  Einstellungen, Wohnungsdetail, Mieter-Zugänge sowie das komplette Mieter-Portal
+  – 11 Dateien, 16 Fundstellen) blieb nach dem ersten Laden eine CSS-Klasse
+  (`flex items-center justify-center`, ursprünglich nur für den Ladespinner
+  gedacht) dauerhaft am Seiten-Container hängen. Dadurch wurden Tabellen,
+  Karten und Diagramme horizontal nebeneinander statt normal untereinander
+  dargestellt und liefen über den Bildschirmrand hinaus. Root-Cause behoben:
+  der Spinner steckt jetzt in einem eigenen inneren Wrapper-Div statt direkt
+  am äußeren Container zu hängen. Mit Playwright-Screenshots nach Login
+  verifiziert – alle Seiten bauen sich jetzt korrekt vertikal auf.)
 
 ## Entwicklung (lokal / Sandbox)
 ```bash
