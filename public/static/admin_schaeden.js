@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/schaeden', async (app) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('schaeden', `<div id="sch-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Schadensmeldungen' });
+  app.innerHTML = renderLayout('schaeden', `<div id="sch-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Schadensmeldungen' });
   attachLayoutHandlers(() => loadSchaeden());
   await loadSchaeden();
 });

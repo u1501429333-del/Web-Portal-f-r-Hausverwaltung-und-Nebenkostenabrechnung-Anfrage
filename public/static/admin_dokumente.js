@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/dokumente', async (app) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('dokumente', `<div id="doc-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Dokumente' });
+  app.innerHTML = renderLayout('dokumente', `<div id="doc-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Dokumente' });
   attachLayoutHandlers(() => loadDokumente());
   await loadDokumente();
 });

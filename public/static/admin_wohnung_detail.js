@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/wohnung/:id', async (app, params) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('objekte', `<div id="wd-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Wohnungsdetail' });
+  app.innerHTML = renderLayout('objekte', `<div id="wd-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Wohnungsdetail' });
   attachLayoutHandlers(() => router());
   await loadWohnungDetail(params.id);
 });

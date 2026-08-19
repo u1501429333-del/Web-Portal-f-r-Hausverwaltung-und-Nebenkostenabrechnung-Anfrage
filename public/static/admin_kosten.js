@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/kosten', async (app) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('kosten', `<div id="kosten-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Kosten erfassen' });
+  app.innerHTML = renderLayout('kosten', `<div id="kosten-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Kosten erfassen' });
   attachLayoutHandlers(() => loadKosten());
   await loadKosten();
 });

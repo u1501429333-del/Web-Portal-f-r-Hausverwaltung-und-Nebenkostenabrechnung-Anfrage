@@ -9,7 +9,7 @@ async function getMieterWohnung() {
 }
 
 registerRoute('/mieter', async (app) => {
-  app.innerHTML = renderLayout('dashboard', `<div id="m-dash" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Meine Übersicht' });
+  app.innerHTML = renderLayout('dashboard', `<div id="m-dash"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Meine Übersicht' });
   attachLayoutHandlersMieter();
   await loadMieterDashboard();
 });
@@ -92,7 +92,7 @@ function vergleichSpan(aktuell, alt) {
 
 // -------- Zählerstand melden --------
 registerRoute('/mieter/zaehler', async (app) => {
-  app.innerHTML = renderLayout('zaehler', `<div id="m-zs" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Zählerstand melden' });
+  app.innerHTML = renderLayout('zaehler', `<div id="m-zs"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Zählerstand melden' });
   attachLayoutHandlersMieter();
   await loadMieterZaehler();
 });
@@ -208,7 +208,7 @@ function wmzAblesehilfeHtml(wohnungId, jahr) {
 
 // -------- Verlauf & Vergleich --------
 registerRoute('/mieter/historie', async (app) => {
-  app.innerHTML = renderLayout('historie', `<div id="m-hist" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Verlauf & Vergleich' });
+  app.innerHTML = renderLayout('historie', `<div id="m-hist"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Verlauf & Vergleich' });
   attachLayoutHandlersMieter();
   await loadMieterHistorie();
 });
@@ -284,7 +284,7 @@ async function loadMieterHistorie() {
 
 // -------- Nebenkostenabrechnung ansehen/drucken --------
 registerRoute('/mieter/abrechnung', async (app) => {
-  app.innerHTML = renderLayout('abrechnung', `<div id="m-abr" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Nebenkostenabrechnung' });
+  app.innerHTML = renderLayout('abrechnung', `<div id="m-abr"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Nebenkostenabrechnung' });
   attachLayoutHandlersMieter();
   await loadMieterAbrechnung();
 });
@@ -322,7 +322,7 @@ async function loadMieterAbrechnung() {
 
 // -------- Schadensmeldung --------
 registerRoute('/mieter/schaeden', async (app) => {
-  app.innerHTML = renderLayout('schaeden', `<div id="m-sch" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Schadensmeldung' });
+  app.innerHTML = renderLayout('schaeden', `<div id="m-sch"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Schadensmeldung' });
   attachLayoutHandlersMieter();
   await loadMieterSchaeden();
 });
@@ -411,7 +411,7 @@ const SCHADEN_STATUS_COLOR_M = { offen: 'bg-red-100 text-red-700', in_bearbeitun
 
 // -------- Unterlagen (Upload z. B. Zählerfotos) --------
 registerRoute('/mieter/unterlagen', async (app) => {
-  app.innerHTML = renderLayout('unterlagen', `<div id="m-unt" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Unterlagen' });
+  app.innerHTML = renderLayout('unterlagen', `<div id="m-unt"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Unterlagen' });
   attachLayoutHandlersMieter();
   await loadMieterUnterlagen();
 });

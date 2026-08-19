@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/einstellungen', async (app) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('einstellungen', `<div id="est-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Stammdaten / Branding' });
+  app.innerHTML = renderLayout('einstellungen', `<div id="est-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Stammdaten / Branding' });
   attachLayoutHandlers(() => router());
   await loadEinstellungen();
 });

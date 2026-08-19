@@ -16,7 +16,7 @@ registerRoute('/admin', async (app) => {
     return;
   }
 
-  app.innerHTML = renderLayout('dashboard', `<div id="dash-content" class="flex items-center justify-center py-20"><div class="spinner"></div></div>`, { title: 'Dashboard' });
+  app.innerHTML = renderLayout('dashboard', `<div id="dash-content"><div class="flex items-center justify-center py-20"><div class="spinner"></div></div></div>`, { title: 'Dashboard' });
   attachLayoutHandlers(() => router());
 
   await loadDashboard();

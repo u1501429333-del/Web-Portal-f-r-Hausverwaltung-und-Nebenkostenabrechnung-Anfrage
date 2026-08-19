@@ -17,7 +17,7 @@ registerRoute('/admin/mieter-zugaenge', async (app) => {
     return;
   }
 
-  app.innerHTML = renderLayout('mieter-zugaenge', `<div id="mz-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Mieter-Zugänge' });
+  app.innerHTML = renderLayout('mieter-zugaenge', `<div id="mz-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Mieter-Zugänge' });
   attachLayoutHandlers(() => loadMieterZugaenge());
   await loadMieterZugaenge();
 });

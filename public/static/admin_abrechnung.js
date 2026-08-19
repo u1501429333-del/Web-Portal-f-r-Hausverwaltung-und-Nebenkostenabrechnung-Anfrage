@@ -3,7 +3,7 @@
 // ============================================================
 registerRoute('/admin/abrechnung', async (app) => {
   await ensureObjekteLoaded();
-  app.innerHTML = renderLayout('abrechnung', `<div id="abr-content" class="flex items-center justify-center py-16"><div class="spinner"></div></div>`, { title: 'Abrechnung' });
+  app.innerHTML = renderLayout('abrechnung', `<div id="abr-content"><div class="flex items-center justify-center py-16"><div class="spinner"></div></div></div>`, { title: 'Abrechnung' });
   attachLayoutHandlers(() => loadAbrechnungUebersicht());
   await loadAbrechnungUebersicht();
 });
