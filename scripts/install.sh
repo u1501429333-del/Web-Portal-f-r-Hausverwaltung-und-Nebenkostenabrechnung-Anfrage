@@ -1,22 +1,12 @@
 #!/bin/bash
-# ============================================================
-# Install-Skript: UHV-Web-Portal Blau v3 – Erstinstallation
-# Für Debian/Armbian-basierte Systeme (z.B. TV-Box mit Amlogic S912)
-#
-# Nutzung:
-#   bash scripts/install.sh
-# ============================================================
 set -e
-
-REPO_URL="https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git"
-INSTALL_DIR="${1:-/opt/Uhv-Portal-v3-Blau}"
 
 echo "============================================================"
 echo " UHV-Web-Portal Blau v3 – Installation"
 echo "============================================================"
 echo ""
 
-# ---------- 1. Systemprüfung ----------------------------------
+# 1. Systemprüfung
 echo "==> Pruefe Systemvoraussetzungen ..."
 ARCH=$(uname -m)
 echo "    Architektur: $ARCH"
@@ -26,65 +16,35 @@ case "$ARCH" in
   *) echo "    WARNUNG: Unbekannte Architektur ($ARCH)." ;;
 esac
 
-TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
-echo "    Gesamt-RAM: ${TOTAL_RAM_MB:-unbekannt} MB"
-if [ -n "$TOTAL_RAM_MB" ] && [ "$TOTAL_RAM_MB" -lt 900 ]; then
+RAM=$(free -m | awk '/^Mem:/{print $2}')
+echo "    RAM: ${RAM} MB"
+if [ "$RAM" -lt 900 ]; then
   echo "    WARNUNG: Weniger als 1 GB RAM."
 fi
 
-FREE_DISK_MB=$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}')
-echo "    Freier Speicherplatz auf /: ${FREE_DISK_MB:-unbekannt} MB"
-if [ -n "$FREE_DISK_MB" ] && [ "$FREE_DISK_MB" -lt 2000 ]; then
+DISK=$(df -Pm / | awk 'NR==2{print $4}')
+echo "    Freier Speicherplatz: ${DISK} MB"
+if [ "$DISK" -lt 2000 ]; then
   echo "    WARNUNG: Weniger als 2 GB frei."
 fi
 
-CPU_CORES=$(nproc 2>/dev/null || echo "")
-echo "    CPU-Kerne: ${CPU_CORES:-unbekannt}"
 echo ""
 
-# ---------- 2. Docker prüfen ---------------------------------
-if command -v docker >/dev/null 2>&1; then
-  echo "==> Docker ist bereits installiert: $(docker --version)"
-else
+# 2. Docker prüfen
+if ! command -v docker >/dev/null 2>&1; then
   echo "==> Docker wird installiert ..."
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-  sudo sh /tmp/get-docker.sh
-  sudo usermod -aG docker "$USER" || true
+  sh /tmp/get-docker.sh
 fi
+docker compose version || { echo "FEHLER: docker compose nicht gefunden."; exit 1; }
 
-if docker compose version >/dev/null 2>&1; then
-  echo "==> Docker Compose Plugin ist vorhanden: $(docker compose version)"
-else
-  echo "==> FEHLER: 'docker compose' Plugin nicht gefunden."
-  exit 1
-fi
-echo ""
+# 3. Projektverzeichnis erstellen
+mkdir -p /opt/Uhv-Portal-v3-Blau
+cd /opt/Uhv-Portal-v3-Blau
 
-# ---------- 3. Repository klonen -----------------------------
-if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "==> Projektordner existiert bereits – ueberspringe Klonen."
-else
-  echo "==> Klone Repository nach $INSTALL_DIR ..."
-  sudo mkdir -p "$(dirname "$INSTALL_DIR")"
-  sudo chown "$USER":"$USER" "$(dirname "$INSTALL_DIR")" 2>/dev/null || true
-  git clone "$REPO_URL" "$INSTALL_DIR"
-fi
-cd "$INSTALL_DIR"
-chmod +x scripts/*.sh docker/entrypoint.sh 2>/dev/null || true
-
-# ---------- 4. docker-compose.yml korrekt erstellen ----------
-echo "==> Erstelle docker-compose.yml mit korrekten Werten ..."
+# 4. docker-compose.yml erstellen
+echo "==> Erstelle docker-compose.yml ..."
 cat > docker-compose.yml << 'EOF'
-# ============================================================
-# UHV-Web-Portal-blau (v3) – docker-compose für Self-Hosting
-# Getestet für: Amlogic S912 TV-Box, Armbian Linux 6.1.149-ophub,
-#               Debian bookworm, ARM64 (arm64/aarch64)
-#
-# Start:   docker compose up -d --build
-# Logs:    docker compose logs -f
-# Stop:    docker compose down
-# Update:  siehe scripts/update.sh
-# ============================================================
 services:
   hausverwaltung-blau-p3000:
     build:
@@ -118,36 +78,23 @@ volumes:
     driver: local
 EOF
 
-echo ""
-
-# ---------- 5. Alte Container entfernen (falls vorhanden) ----
+# 5. Alte Container entfernen
 echo "==> Entferne alte Container (falls vorhanden) ..."
-docker stop uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
-docker rm uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
+docker stop uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null || true
+docker rm uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null || true
 
-# ---------- 6. Docker-Image bauen + starten -----------------
+# 6. Image bauen und Container starten
 echo "==> Baue Docker-Image (kann einige Minuten dauern) ..."
 docker compose build
-
 echo "==> Starte Container ..."
 docker compose up -d
 
-echo ""
-echo "==> Warte 10 Sekunden auf den Start ..."
 sleep 10
 docker compose ps
 
-LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo ""
 echo "============================================================"
 echo " Installation abgeschlossen!"
-echo " Aufrufbar unter: http://${LOCAL_IP:-<TVBOX-IP>}:3000"
-echo ""
-echo " Standard-Zugangsdaten (Demo-Daten aus der Basis-Migration):"
-echo "   Admin:  admin@hausverwaltung.de  / admin123"
-echo "   Mieter: mieter1@example.com      / mieter123"
-echo ""
-echo " WICHTIG: Bitte nach dem ersten Login sofort das Admin-Passwort"
-echo " aendern (aktuell noch ueber die Datenbank/'wrangler d1 execute';"
-echo " ein UI-Dialog dafuer ist fuer eine kommende Version geplant)."
+echo " Aufrufbar unter: http://$(hostname -I | awk '{print $1}'):3000"
+echo " Admin: admin@hausverwaltung.de / admin123"
 echo "============================================================"
