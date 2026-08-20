@@ -72,7 +72,7 @@ fi
 cd "$INSTALL_DIR"
 chmod +x scripts/*.sh docker/entrypoint.sh 2>/dev/null || true
 
-# ---------- 4. docker-compose.yml direkt überschreiben ------
+# ---------- 4. docker-compose.yml korrekt erstellen ----------
 echo "==> Erstelle docker-compose.yml mit korrekten Werten ..."
 cat > docker-compose.yml << 'EOF'
 # ============================================================
@@ -120,7 +120,12 @@ EOF
 
 echo ""
 
-# ---------- 5. Docker-Image bauen + starten -----------------
+# ---------- 5. Alten Container entfernen (falls vorhanden) ----
+echo "==> Entferne alte Container (falls vorhanden) ..."
+docker stop uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
+docker rm uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
+
+# ---------- 6. Docker-Image bauen + starten -----------------
 echo "==> Baue Docker-Image (kann einige Minuten dauern) ..."
 docker compose build
 
