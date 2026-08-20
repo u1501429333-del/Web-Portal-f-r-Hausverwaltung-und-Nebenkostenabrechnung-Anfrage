@@ -3,18 +3,8 @@
 # Install-Skript: UHV-Web-Portal Blau v3 – Erstinstallation
 # Für Debian/Armbian-basierte Systeme (z.B. TV-Box mit Amlogic S912)
 #
-# Führt automatisch aus:
-#   1. System-Leistungsprüfung (RAM, Speicherplatz, CPU, Architektur)
-#   2. Prüfung/Installation von Docker + Docker Compose Plugin
-#   3. Repository klonen (falls nicht schon vorhanden)
-#   4. Docker-Image bauen und Container starten
-#   5. Migrationen automatisch anwenden (im Container-Start enthalten)
-#
 # Nutzung:
 #   bash scripts/install.sh
-#
-# Muss mit einem Benutzer ausgeführt werden, der sudo-Rechte hat
-# (für die Docker-Installation, falls Docker noch nicht vorhanden ist).
 # ============================================================
 set -e
 
@@ -26,88 +16,53 @@ echo " UHV-Web-Portal Blau v3 – Installation"
 echo "============================================================"
 echo ""
 
-# ---------- 1. System-Leistungsprüfung ----------------------------------
+# ---------- 1. Systemprüfung ----------------------------------
 echo "==> Pruefe Systemvoraussetzungen ..."
-
 ARCH=$(uname -m)
 echo "    Architektur: $ARCH"
 case "$ARCH" in
-  aarch64|arm64) echo "    OK: ARM64 wird unterstuetzt (passt zu Amlogic S912)." ;;
+  aarch64|arm64) echo "    OK: ARM64 wird unterstuetzt." ;;
   x86_64) echo "    OK: x86_64 wird unterstuetzt." ;;
-  *) echo "    WARNUNG: Unbekannte/ungetestete Architektur ($ARCH). Fortsetzen auf eigenes Risiko." ;;
+  *) echo "    WARNUNG: Unbekannte Architektur ($ARCH)." ;;
 esac
 
-# Robuste RAM-Erkennung: "free -m" liefert je nach Locale/Version/Coreutils-Variante
-# (z.B. manche minimalen Armbian-Images ohne "procps") teils eine leere/anders
-# formatierte Ausgabe zurück, wodurch der numerische Vergleich unten mit
-# "[: : Ganzzahliger Ausdruck erwartet" fehlschlägt. Daher: zuerst /proc/meminfo
-# (immer im gleichen Format vorhanden), "free -m" nur als Fallback, und am Ende
-# zusätzlich auf eine gültige Zahl prüfen, bevor verglichen wird.
-TOTAL_RAM_MB=""
-if [ -r /proc/meminfo ]; then
-  TOTAL_RAM_KB=$(awk '/^MemTotal:/{print $2}' /proc/meminfo)
-  if [ -n "$TOTAL_RAM_KB" ]; then
-    TOTAL_RAM_MB=$((TOTAL_RAM_KB / 1024))
-  fi
-fi
-if [ -z "$TOTAL_RAM_MB" ] && command -v free >/dev/null 2>&1; then
-  TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
-fi
+TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
 echo "    Gesamt-RAM: ${TOTAL_RAM_MB:-unbekannt} MB"
-if [ -n "$TOTAL_RAM_MB" ] && [ "$TOTAL_RAM_MB" -eq "$TOTAL_RAM_MB" ] 2>/dev/null; then
-  if [ "$TOTAL_RAM_MB" -lt 900 ]; then
-    echo "    WARNUNG: Weniger als 1 GB RAM erkannt. Die App benoetigt mindestens ca. 300-500 MB frei."
-    echo "             Bitte unwichtige Container (z.B. testweise) stoppen, falls Probleme auftreten."
-  else
-    echo "    OK: Ausreichend RAM vorhanden."
-  fi
-else
-  echo "    HINWEIS: RAM-Menge konnte nicht ermittelt werden – Pruefung wird uebersprungen."
+if [ -n "$TOTAL_RAM_MB" ] && [ "$TOTAL_RAM_MB" -lt 900 ]; then
+  echo "    WARNUNG: Weniger als 1 GB RAM."
 fi
 
 FREE_DISK_MB=$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}')
 echo "    Freier Speicherplatz auf /: ${FREE_DISK_MB:-unbekannt} MB"
-if [ -n "$FREE_DISK_MB" ] && [ "$FREE_DISK_MB" -eq "$FREE_DISK_MB" ] 2>/dev/null; then
-  if [ "$FREE_DISK_MB" -lt 2000 ]; then
-    echo "    WARNUNG: Weniger als 2 GB frei. Docker-Images + Datenbank benoetigen dauerhaft Platz."
-  else
-    echo "    OK: Ausreichend Speicherplatz vorhanden."
-  fi
-else
-  echo "    HINWEIS: Freier Speicherplatz konnte nicht ermittelt werden – Pruefung wird uebersprungen."
+if [ -n "$FREE_DISK_MB" ] && [ "$FREE_DISK_MB" -lt 2000 ]; then
+  echo "    WARNUNG: Weniger als 2 GB frei."
 fi
 
 CPU_CORES=$(nproc 2>/dev/null || echo "")
 echo "    CPU-Kerne: ${CPU_CORES:-unbekannt}"
-if [ -n "$CPU_CORES" ] && [ "$CPU_CORES" -eq "$CPU_CORES" ] 2>/dev/null && [ "$CPU_CORES" -lt 2 ]; then
-  echo "    HINWEIS: Nur 1 CPU-Kern erkannt. Der Docker-Build (npm/vite) kann dadurch mehrere Minuten dauern."
-fi
 echo ""
 
-# ---------- 2. Docker prüfen / installieren ------------------------------
+# ---------- 2. Docker prüfen ---------------------------------
 if command -v docker >/dev/null 2>&1; then
   echo "==> Docker ist bereits installiert: $(docker --version)"
 else
-  echo "==> Docker wird installiert (offizielles Docker-Installationsskript) ..."
+  echo "==> Docker wird installiert ..."
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
   sudo sh /tmp/get-docker.sh
   sudo usermod -aG docker "$USER" || true
-  echo "    Docker installiert. Hinweis: Falls 'docker'-Befehle 'permission denied' melden,"
-  echo "    einmal ab- und wieder anmelden (Gruppenmitgliedschaft 'docker')."
 fi
 
 if docker compose version >/dev/null 2>&1; then
   echo "==> Docker Compose Plugin ist vorhanden: $(docker compose version)"
 else
-  echo "==> FEHLER: 'docker compose' Plugin nicht gefunden. Bitte manuell installieren:"
-  echo "    sudo apt-get update && sudo apt-get install -y docker-compose-plugin"
+  echo "==> FEHLER: 'docker compose' Plugin nicht gefunden."
   exit 1
 fi
 echo ""
 
-# ---------- 3. Repository klonen -----------------------------------------
+# ---------- 3. Repository klonen -----------------------------
 if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "==> Projektordner existiert bereits unter $INSTALL_DIR – ueberspringe Klonen."
+  echo "==> Projektordner existiert bereits – ueberspringe Klonen."
 else
   echo "==> Klone Repository nach $INSTALL_DIR ..."
   sudo mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -117,17 +72,56 @@ fi
 cd "$INSTALL_DIR"
 chmod +x scripts/*.sh docker/entrypoint.sh 2>/dev/null || true
 
-# --- Container-Name und Volume anpassen ---
-echo "==> Passe docker-compose.yml an (Container-Name, Volume, Netzwerk) ..."
-sed -i 's/container_name: .*/container_name: uhv-web-portal-blau-p3000/' docker-compose.yml
-sed -i 's/- hausverwaltung_data:\/app\/data/- uhv-web-blau-p3000_data:\/app\/data/' docker-compose.yml
-sed -i 's/hausverwaltung_net/uhv-web-blau-p3000_net/g' docker-compose.yml
-# ------------------------------------------------
+# ---------- 4. docker-compose.yml direkt überschreiben ------
+echo "==> Erstelle docker-compose.yml mit korrekten Werten ..."
+cat > docker-compose.yml << 'EOF'
+# ============================================================
+# UHV-Web-Portal-blau (v3) – docker-compose für Self-Hosting
+# Getestet für: Amlogic S912 TV-Box, Armbian Linux 6.1.149-ophub,
+#               Debian bookworm, ARM64 (arm64/aarch64)
+#
+# Start:   docker compose up -d --build
+# Logs:    docker compose logs -f
+# Stop:    docker compose down
+# Update:  siehe scripts/update.sh
+# ============================================================
+services:
+  hausverwaltung-blau-p3000:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: uhv-web-portal:latest
+    container_name: uhv-web-portal-blau-p3000
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - uhv-web-blau-p3000_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - uhv-web-blau-p3000_net
+
+networks:
+  uhv-web-blau-p3000_net:
+    driver: bridge
+
+volumes:
+  uhv-web-blau-p3000_data:
+    driver: local
+EOF
 
 echo ""
 
-# ---------- 4. Docker-Image bauen + starten -------------------------------
-echo "==> Baue Docker-Image (dies kann beim ersten Mal einige Minuten dauern) ..."
+# ---------- 5. Docker-Image bauen + starten -----------------
+echo "==> Baue Docker-Image (kann einige Minuten dauern) ..."
 docker compose build
 
 echo "==> Starte Container ..."
