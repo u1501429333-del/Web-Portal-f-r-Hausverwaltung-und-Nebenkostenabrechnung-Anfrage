@@ -1,5 +1,5 @@
 # ============================================================
-# UHV-Web-Portal (v3) – docker-compose für Self-Hosting
+# UHV-Web-Portal-blau (v3) – docker-compose für Self-Hosting
 # Getestet für: Amlogic S912 TV-Box, Armbian Linux 6.1.149-ophub,
 #               Debian bookworm, ARM64 (arm64/aarch64)
 #
@@ -9,12 +9,12 @@
 # Update:  siehe scripts/update.sh
 # ============================================================
 services:
-  hausverwaltung:
+  hausverwaltung-blau-p3000:
     build:
       context: .
       dockerfile: Dockerfile
     image: uhv-web-portal:latest
-    container_name: uhv-web-portal
+    container_name: uhv-web-portal-blau-p3000
     restart: unless-stopped
     ports:
       # Host-Port links, Container-Port rechts.
@@ -27,7 +27,7 @@ services:
       # Dokumente, Logo/Branding, Logins).
       # OHNE dieses Volume gehen bei jedem Container-Neustart alle Daten verloren!
       # WICHTIG: Der Volume-Name "hausverwaltung_data" wird bewusst NICHT auf
-      # "uhv_data" umbenannt, obwohl die App jetzt "UHV-Web-Portal" heißt –
+      # "uhv_data" umbenannt, obwohl die App jetzt "UHV-Web-Portal-blau-p3000" heißt –
       # Docker würde bei einem geänderten Namen ein NEUES, leeres Volume
       # anlegen und alle bereits erfassten Objekte/Wohnungen/Mieter/
       # Zählerstände/Kosten bestehender Installationen wären scheinbar
@@ -37,7 +37,7 @@ services:
       # nativen Node-Server, siehe Dockerfile). Bei einem Update von einer
       # Installation vor diesem Fix bitte einmalig die alte Datenbankdatei
       # aus dem Volume kopieren, siehe INSTALL.md "Fehlerbehebung".
-      - hausverwaltung_data:/app/data
+      - uhv-web-blau-p3000_data:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -50,12 +50,12 @@ services:
     # Mit Portainer/Homeassistant kompatibles, eigenständiges Netzwerk;
     # bei Bedarf hier ein externes Netzwerk (z.B. "proxy") einbinden.
     networks:
-      - hausverwaltung_net
+      - uhv-web-blau-p3000_net
 
 networks:
-  hausverwaltung_net:
+  uhv-web-blau-p3000_net:
     driver: bridge
 
 volumes:
-  hausverwaltung_data:
+  - uhv-web-blau-p3000_data:/app/data
     driver: local
