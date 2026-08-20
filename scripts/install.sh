@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Install-Skript: UHV-Web-Portal v3 – Erstinstallation
+# Install-Skript: UHV-Web-Portal Blau v3 – Erstinstallation
 # Für Debian/Armbian-basierte Systeme (z.B. TV-Box mit Amlogic S912)
 #
 # Führt automatisch aus:
@@ -22,7 +22,7 @@ REPO_URL="https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-N
 INSTALL_DIR="${1:-/opt/Uhv-Portal-v3-Blau}"
 
 echo "============================================================"
-echo " UHV-Web-Portal v3 – Installation"
+echo " UHV-Web-Portal Blau v3 – Installation"
 echo "============================================================"
 echo ""
 
