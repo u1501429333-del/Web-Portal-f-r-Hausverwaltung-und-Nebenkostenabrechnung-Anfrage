@@ -120,7 +120,7 @@ EOF
 
 echo ""
 
-# ---------- 5. Alten Container entfernen (falls vorhanden) ----
+# ---------- 5. Alte Container entfernen (falls vorhanden) ----
 echo "==> Entferne alte Container (falls vorhanden) ..."
 docker stop uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
 docker rm uhv-web-portal-blau-p3000 uhv-web-portal 2>/dev/null
