@@ -16,12 +16,9 @@ services:
     image: uhv-web-portal:latest
     container_name: uhv-web-portal-blau-p3000
     restart: unless-stopped
-    ports:
       # Host-Port links, Container-Port rechts.
       # 3000 frei wählbar anpassen, falls auf der TV-Box schon belegt
       # (homeassistant/portainer laufen üblicherweise auf anderen Ports).
-      - "3000:3000"
-    volumes:
       # Persistiert die komplette Datenbank (node:sqlite, D1-kompatibel via
       # server/d1-shim.mjs: Objekte, Wohnungen, Mieter, Zählerstände, Kosten,
       # Dokumente, Logo/Branding, Logins).
@@ -37,6 +34,9 @@ services:
       # nativen Node-Server, siehe Dockerfile). Bei einem Update von einer
       # Installation vor diesem Fix bitte einmalig die alte Datenbankdatei
       # aus dem Volume kopieren, siehe INSTALL.md "Fehlerbehebung".
+    ports:
+      - "3000:3000"
+    volumes:
       - uhv-web-blau-p3000_data:/app/data
     environment:
       - NODE_ENV=production
@@ -47,9 +47,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    # Mit Portainer/Homeassistant kompatibles, eigenständiges Netzwerk;
-    # bei Bedarf hier ein externes Netzwerk (z.B. "proxy") einbinden.
-    networks:
+      networks:
       - uhv-web-blau-p3000_net
 
 networks:
@@ -57,5 +55,6 @@ networks:
     driver: bridge
 
 volumes:
-  - uhv-web-blau-p3000_data:/app/data
+  uhv-web-blau-p3000_data:
     driver: local
+
