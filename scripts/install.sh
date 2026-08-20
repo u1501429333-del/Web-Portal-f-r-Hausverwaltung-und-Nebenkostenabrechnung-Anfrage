@@ -19,7 +19,7 @@
 set -e
 
 REPO_URL="https://github.com/u1501429333-del/Web-Portal-f-r-Hausverwaltung-und-Nebenkostenabrechnung-Anfrage.git"
-INSTALL_DIR="${1:-/opt/hausverwaltung}"
+INSTALL_DIR="${1:-/opt/Uhv-Portal-v3-Blau}"
 
 echo "============================================================"
 echo " UHV-Web-Portal v3 – Installation"
@@ -116,6 +116,14 @@ else
 fi
 cd "$INSTALL_DIR"
 chmod +x scripts/*.sh docker/entrypoint.sh 2>/dev/null || true
+
+# --- Container-Name und Volume anpassen ---
+echo "==> Passe docker-compose.yml an (Container-Name, Volume, Netzwerk) ..."
+sed -i 's/container_name: .*/container_name: uhv-web-portal-blau-p3000/' docker-compose.yml
+sed -i 's/- hausverwaltung_data:\/app\/data/- uhv-web-blau-p3000_data:\/app\/data/' docker-compose.yml
+sed -i 's/hausverwaltung_net/uhv-web-blau-p3000_net/g' docker-compose.yml
+# ------------------------------------------------
+
 echo ""
 
 # ---------- 4. Docker-Image bauen + starten -------------------------------
